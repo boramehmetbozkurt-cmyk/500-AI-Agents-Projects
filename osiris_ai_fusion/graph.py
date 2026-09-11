@@ -8,7 +8,7 @@ from langgraph.graph import END, StateGraph
 
 from config import get_settings
 from llm import ModelRouter
-from osiris_client import READ_ONLY_TOOLS, OsirisClient
+from osiris_client import READ_ONLY_TOOLS, OsirisClient, normalize_tool_name
 from provenance import confidence_from_evidence, evidence_bundle_digest
 from seal import ReplayGuard, authorize_execution, seal_intent, sign_receipt
 
@@ -31,21 +31,53 @@ KEYWORD_TOOL_MAP = {
     "earthquake": "earthquakes",
     "yangın": "fires",
     "fire": "fires",
-    "uçuş": "aircraft",
-    "uçak": "aircraft",
-    "flight": "aircraft",
+    "uçuş": "flights",
+    "uçak": "flights",
+    "flight": "flights",
+    "hava durumu": "weather",
+    "weather": "weather",
     "hava kalitesi": "air_quality",
     "air quality": "air_quality",
+    "uydu": "satellites",
+    "satellite": "satellites",
+    "uzay havası": "space_weather",
+    "space weather": "space_weather",
+    "radar": "radar",
     "çatışma": "conflicts",
     "conflict": "conflicts",
+    "cephe": "frontlines",
+    "frontline": "frontlines",
+    "gdelt": "gdelt",
     "ülke riski": "country_risk",
     "country risk": "country_risk",
-    "siber": "cyber_threats",
-    "cyber": "cyber_threats",
+    "haber": "news",
+    "news": "news",
+    "piyasa": "markets",
+    "market": "markets",
     "kripto": "crypto",
     "crypto": "crypto",
     "kamera": "cctv",
     "cctv": "cctv",
+    "altyapı": "infrastructure",
+    "infrastructure": "infrastructure",
+    "deniz": "maritime",
+    "maritime": "maritime",
+    "gemi": "maritime",
+    "siber saldırı": "cyber_attacks",
+    "cyber attack": "cyber_attacks",
+    "siber": "cyber_threats",
+    "cyber": "cyber_threats",
+    "zararlı yazılım": "malware",
+    "malware": "malware",
+}
+
+DEFAULT_TOOL_SET = {
+    "earthquakes",
+    "fires",
+    "flights",
+    "weather",
+    "news",
+    "country_risk",
 }
 
 
@@ -54,10 +86,10 @@ def _plan_tools(query: str, requested_tools: list[str] | None = None) -> list[st
     q = query.lower()
     selected = {tool for keyword, tool in KEYWORD_TOOL_MAP.items() if keyword in q}
     if not selected:
-        selected = {"earthquakes", "fires", "aircraft", "conflicts", "country_risk"}
+        selected = set(DEFAULT_TOOL_SET)
 
     if requested_tools is not None:
-        requested = {tool.lower() for tool in requested_tools}
+        requested = {normalize_tool_name(tool) for tool in requested_tools}
         unknown = requested.difference(READ_ONLY_TOOLS)
         if unknown:
             raise PermissionError(f"Unknown or non-read-only tools requested: {sorted(unknown)}")
@@ -88,6 +120,7 @@ async def collector_node(state: AgentState) -> AgentState:
     semaphore = asyncio.Semaphore(settings.max_parallel_tools)
 
     async with OsirisClient() as client:
+
         async def one(tool: str) -> tuple[str, Any]:
             async with semaphore:
                 return tool, await client.fetch_tool(tool)
