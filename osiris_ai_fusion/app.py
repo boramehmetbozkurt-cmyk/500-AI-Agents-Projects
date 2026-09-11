@@ -23,7 +23,7 @@ rate_limiter = InMemoryRateLimiter(settings.request_limit_per_minute)
 
 app = FastAPI(
     title="OSIRIS AI Fusion",
-    version="0.3.0",
+    version="0.4.0",
     description="Evidence-first, authorization-aware, read-only OSINT research API.",
 )
 
@@ -121,12 +121,21 @@ async def ready(_: str = Depends(require_api_key)) -> dict[str, Any]:
     return result
 
 
+@app.get("/osiris-contract")
+async def osiris_contract(_: str = Depends(require_api_key)) -> dict[str, Any]:
+    """Probe only OSIRIS' documented passive health/stats contract."""
+    async with OsirisClient() as client:
+        return await client.passive_contract_probe()
+
+
 @app.get("/tools")
 async def tools(_: str = Depends(require_api_key)) -> dict[str, Any]:
     return {
         "mode": "read-only",
         "tools": sorted(READ_ONLY_TOOLS),
         "excluded": [
+            "scanner",
+            "osint_sweep",
             "active_scanning",
             "exploitation",
             "credential_access",
