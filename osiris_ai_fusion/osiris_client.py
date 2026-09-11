@@ -8,18 +8,47 @@ import httpx
 from config import get_settings
 from provenance import make_evidence_record
 
+# Canonical passive/read-only OSIRIS feeds verified against the public API docs.
+# Active traffic-producing routes such as /api/scanner and /api/osint/sweep are
+# intentionally excluded from the autonomous registry.
 READ_ONLY_TOOLS: dict[str, str] = {
+    "flights": "/api/flights",
+    "satellites": "/api/satellites",
+    "space_weather": "/api/space-weather",
     "earthquakes": "/api/earthquakes",
     "fires": "/api/fires",
+    "weather": "/api/weather",
     "air_quality": "/api/air-quality",
+    "radar": "/api/radar",
     "conflicts": "/api/conflicts",
+    "frontlines": "/api/frontlines",
+    "gdelt": "/api/gdelt",
     "country_risk": "/api/country-risk",
-    "cyber_threats": "/api/cyber-threats",
-    "cyber_attacks": "/api/cyber-attacks",
+    "news": "/api/news",
+    "markets": "/api/markets",
     "crypto": "/api/crypto",
     "cctv": "/api/cctv",
-    "aircraft": "/api/aircraft",
+    "infrastructure": "/api/infrastructure",
+    "maritime": "/api/maritime",
+    "cyber_threats": "/api/cyber-threats",
+    "cyber_attacks": "/api/cyber-attacks",
+    "malware": "/api/malware",
 }
+
+TOOL_ALIASES: dict[str, str] = {
+    "aircraft": "flights",
+    "flight": "flights",
+}
+
+FORBIDDEN_ACTIVE_PATHS = {
+    "/api/scanner",
+    "/api/osint/sweep",
+}
+
+
+def normalize_tool_name(tool: str) -> str:
+    normalized = tool.strip().lower().replace("-", "_")
+    return TOOL_ALIASES.get(normalized, normalized)
 
 
 class OsirisClient:
@@ -45,9 +74,13 @@ class OsirisClient:
             self._client = None
 
     def tool_url(self, tool: str) -> str:
-        if tool not in READ_ONLY_TOOLS:
+        canonical = normalize_tool_name(tool)
+        if canonical not in READ_ONLY_TOOLS:
             raise PermissionError(f"Tool not allowed in read-only mode: {tool}")
-        return self.base_url + READ_ONLY_TOOLS[tool]
+        path = READ_ONLY_TOOLS[canonical]
+        if path in FORBIDDEN_ACTIVE_PATHS:
+            raise PermissionError(f"Active OSIRIS route cannot be called autonomously: {path}")
+        return self.base_url + path
 
     async def _get(self, url: str, params: dict[str, Any] | None = None) -> Any:
         if self._client is None:
@@ -72,16 +105,30 @@ class OsirisClient:
         raise RuntimeError(f"OSIRIS request failed: {last_error}")
 
     async def fetch_tool(self, tool: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
-        url = self.tool_url(tool)
+        canonical = normalize_tool_name(tool)
+        url = self.tool_url(canonical)
         try:
             data = await self._get(url, params)
-            return make_evidence_record(tool=tool, source_url=url, data=data)
+            return make_evidence_record(tool=canonical, source_url=url, data=data)
         except Exception as exc:
             return make_evidence_record(
-                tool=tool,
+                tool=canonical,
                 source_url=url,
                 error=f"{type(exc).__name__}: {exc}",
             )
 
     async def health(self) -> Any:
         return await self._get(self.base_url + "/api/health")
+
+    async def stats(self) -> Any:
+        return await self._get(self.base_url + "/api/stats")
+
+    async def passive_contract_probe(self) -> dict[str, Any]:
+        health, stats = await asyncio.gather(self.health(), self.stats())
+        return {
+            "status": "ok",
+            "base_url": self.base_url,
+            "health": health,
+            "stats": stats,
+            "registered_tools": sorted(READ_ONLY_TOOLS),
+        }
