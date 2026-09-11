@@ -1,0 +1,25 @@
+name: OSIRIS AI Fusion Live Smoke
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 5 * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  passive-live-contract:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: osiris_ai_fusion
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install runtime
+        run: python -m pip install --upgrade pip && pip install -r requirements.txt
+      - name: Probe OSIRIS passive API contract
+        run: python scripts/live_smoke.py --base-url https://osirisai.live
