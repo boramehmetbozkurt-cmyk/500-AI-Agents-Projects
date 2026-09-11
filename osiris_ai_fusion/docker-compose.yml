@@ -1,0 +1,25 @@
+services:
+  api:
+    build: .
+    ports:
+      - "8787:8787"
+    env_file:
+      - .env
+    environment:
+      OLLAMA_BASE_URL: http://ollama:11434
+      SEAL_REPLAY_DB: /data/seal_replay.sqlite3
+    volumes:
+      - seal-data:/data
+    depends_on:
+      - ollama
+
+  ollama:
+    image: ollama/ollama:latest
+    volumes:
+      - ollama-data:/root/.ollama
+    ports:
+      - "11434:11434"
+
+volumes:
+  seal-data:
+  ollama-data:

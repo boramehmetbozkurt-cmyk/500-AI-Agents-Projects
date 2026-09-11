@@ -1,79 +1,78 @@
 # OSIRIS AI Fusion
 
-A read-only, multi-agent OSINT research layer designed to sit on top of OSIRIS.
+**Evidence-first, authorization-aware AI-native OSINT research system.**
 
-## What it does
+OSIRIS AI Fusion turns natural-language research questions into bounded, read-only investigations over
+OSIRIS data sources. It plans tools, seals authority before execution, gathers evidence with provenance,
+uses a local-first model for analysis, and returns a tamper-evident verification receipt.
 
-1. Accepts a natural-language investigation request.
-2. Plans which OSIRIS read-only data tools are relevant.
-3. Creates a SEAL intent envelope before data access.
-4. Collects evidence from OSIRIS APIs in parallel.
-5. Uses a free/local Ollama model for analysis by default.
-6. Produces a verification receipt showing which tools were authorized and used.
+## Production-oriented capabilities
 
-## Current architecture
+- LangGraph orchestration with explicit planner → collector → analyst → verifier stages.
+- Read-only OSIRIS tool registry and hard exclusion of autonomous active scanning/exploitation.
+- Local-first Ollama model routing with optional OpenAI-compatible fallback.
+- Per-source provenance records and SHA-256 evidence bundle binding.
+- Availability-based source confidence metadata plus explicit analytical uncertainty.
+- SEAL v2 canonical CBOR intent commitments.
+- Short-lived nonce + persistent replay detection before tool execution.
+- Tool allow-list, maximum tool-call budget and geo/time/case scope binding.
+- Ed25519-signed receipts binding intent, evidence and analysis digests.
+- Prompt-injection boundary treating external OSINT as untrusted data.
+- API-key auth, single-process rate limiter, request IDs and security headers.
+- Liveness/readiness endpoints and dependency degradation reporting.
+- Response size limits, retry/backoff and bounded tool concurrency.
+- Non-root Docker image, Compose development stack, unit tests and CI quality gates.
+- Optional `smolagents` worker dependency kept outside the core runtime.
 
-- **LangGraph**: stateful orchestration / multi-step agent graph.
-- **Hugging Face smolagents**: installed as the lightweight specialist-agent layer for future tool agents and sandboxed code agents.
-- **Ollama**: free local inference provider by default.
-- **OSIRIS**: live read-only OSINT data source.
-- **SEAL**: canonical intent + policy/effect verification layer.
-
-## Safety boundary
-
-The default registry contains only read-only OSINT endpoints. Active scanning, exploitation, credential access, intrusive surveillance and other offensive actions are intentionally excluded from autonomous execution.
-
-## SEAL v0.1
-
-The current implementation uses:
-
-- Unicode NFC normalization
-- deterministic canonical CBOR
-- lowercase canonical field identifiers
-- domain-separated SHA-256 intent commitments
-- random nonce and short expiration window
-- allow-listed tool execution
-- effect receipt verification
-- optional HMAC-SHA256 receipt authentication via `SEAL_MASTER_KEY_HEX`
-
-SEAL does **not** replace audited encryption primitives. Encryption at rest/in transit should continue to use standard primitives and platform TLS/key-management facilities.
-
-## Run locally
+## Run
 
 ```bash
 cd osiris_ai_fusion
 python -m venv .venv
 # Windows: .venv\Scripts\activate
 # Linux/macOS: source .venv/bin/activate
-pip install -r requirements.txt
+pip install -r requirements-dev.txt
 cp .env.example .env
 ollama pull qwen2.5:7b
 ollama serve
+make check
 uvicorn app:app --reload --port 8787
 ```
 
-Then:
+Example:
 
 ```bash
 curl -X POST http://127.0.0.1:8787/investigate \
   -H "Content-Type: application/json" \
-  -d '{"query":"İzmir ve Ege bölgesinde son 24 saatte olağandışı gelişmeleri araştır"}'
+  -H "X-API-Key: $OSIRIS_FUSION_API_KEY" \
+  -d '{
+    "query":"İzmir ve Ege bölgesinde son 24 saatte olağandışı gelişmeleri araştır",
+    "allowed_tools":["earthquakes","fires","aircraft"],
+    "scope":{"region":"Izmir, TR","time_range":"PT24H","case_id":"demo-001"}
+  }'
 ```
 
-## Next integration step
+## Production mode
 
-When the user's OSIRIS fork becomes available to the connected GitHub account, move this core into the fork and expose it through OSIRIS' Next.js UI as an AI search/command console. The OSIRIS map can then consume the returned evidence coordinates and activate matching layers.
+Set:
 
-## Planned specialist agents
+```bash
+APP_ENV=production
+OSIRIS_FUSION_API_KEY=<strong-random-secret>
+REQUIRE_SIGNED_RECEIPTS=true
+SEAL_ED25519_PRIVATE_KEY_B64=<32-byte-raw-private-key-as-base64>
+```
 
-- Geo Agent
-- Seismic Agent
-- Aviation Agent
-- Fire / Disaster Agent
-- Conflict / News Agent
-- Cyber Threat (defensive/read-only) Agent
-- Correlation Agent
-- Evidence Verifier
-- Report Agent
+Do not commit production secrets. Put signing keys in a managed secret/KMS/HSM boundary.
 
-Each specialist must receive a SEAL-scoped tool allow-list. No agent gets unrestricted tool access.
+## Maturity definition
+
+The repository can be made **10/10-ready**, but production maturity is not declared by code volume.
+A true 10/10 release additionally requires deployment evidence: external security review, load/failure
+tests, dependency/container scanning, backup/restore drills, real OSIRIS integration, and successful
+customer pilots. See `RUNBOOK.md` and `ARCHITECTURE.md`.
+
+## Safety boundary
+
+Automatic execution is limited to lawful/read-only OSINT. Active scanning, exploitation, credentials,
+intrusive surveillance and face-recognition tracking are outside the autonomous registry.

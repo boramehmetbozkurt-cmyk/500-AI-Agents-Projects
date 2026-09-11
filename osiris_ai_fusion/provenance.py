@@ -1,0 +1,81 @@
+from __future__ import annotations
+
+import hashlib
+import json
+import time
+from typing import Any
+
+
+def canonical_json_bytes(value: Any) -> bytes:
+    return json.dumps(
+        value,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+        default=str,
+    ).encode("utf-8")
+
+
+def sha256_hex(value: Any) -> str:
+    return hashlib.sha256(canonical_json_bytes(value)).hexdigest()
+
+
+def make_evidence_record(
+    *,
+    tool: str,
+    source_url: str,
+    data: Any | None = None,
+    error: str | None = None,
+) -> dict[str, Any]:
+    body = {
+        "tool": tool,
+        "source_url": source_url,
+        "fetched_at": int(time.time()),
+        "ok": error is None,
+        "data": data if error is None else None,
+        "error": error,
+    }
+    body["digest"] = sha256_hex(
+        {
+            "tool": body["tool"],
+            "source_url": body["source_url"],
+            "fetched_at": body["fetched_at"],
+            "ok": body["ok"],
+            "data": body["data"],
+            "error": body["error"],
+        }
+    )
+    return body
+
+
+def evidence_bundle_digest(evidence: dict[str, Any]) -> str:
+    stable = {
+        key: {
+            "tool": value.get("tool"),
+            "source_url": value.get("source_url"),
+            "fetched_at": value.get("fetched_at"),
+            "ok": value.get("ok"),
+            "digest": value.get("digest"),
+        }
+        for key, value in sorted(evidence.items())
+    }
+    return sha256_hex(stable)
+
+
+def confidence_from_evidence(evidence: dict[str, Any]) -> dict[str, Any]:
+    total = len(evidence)
+    successes = sum(1 for value in evidence.values() if value.get("ok") is True)
+    failures = total - successes
+    if total == 0:
+        score = 0.0
+    else:
+        score = round(successes / total, 3)
+    label = "high" if score >= 0.8 else "medium" if score >= 0.5 else "low"
+    return {
+        "score": score,
+        "label": label,
+        "successful_sources": successes,
+        "failed_sources": failures,
+        "total_sources": total,
+        "method": "availability-only; analytical confidence must still be stated by the model",
+    }
