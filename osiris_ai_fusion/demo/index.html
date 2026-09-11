@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#071018" />
+  <title>OSIRIS FUSION — Ask OSIRIS</title>
+  <link rel="preconnect" href="https://unpkg.com" crossorigin>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar">
+      <div class="brand"><span class="sigil">◈</span><div><strong>OSIRIS FUSION</strong><small>Evidence-first AI Intelligence OS</small></div></div>
+      <div class="status-row">
+        <span id="modeBadge" class="badge badge-live">LIVE READY</span>
+        <span class="badge">SEAL VERIFIED</span>
+        <span id="clock" class="clock">--:--:--</span>
+      </div>
+    </header>
+
+    <main class="grid">
+      <section class="panel command-panel">
+        <div class="eyebrow">ASK OSIRIS</div>
+        <h1>Dünyayı tek cümleyle araştır.</h1>
+        <p class="muted">AI Commander soruyu çözer, yalnız izinli OSIRIS araçlarını seçer, kanıtı toplar ve SEAL receipt üretir.</p>
+
+        <div class="querybox">
+          <textarea id="query" rows="3" spellcheck="false">İzmir ve Ege Bölgesi'nde son 24 saatte olağandışı ne oldu?</textarea>
+          <button id="runBtn">INVESTIGATE <span>↗</span></button>
+        </div>
+
+        <div class="quick-row">
+          <button class="chip" data-q="Türkiye'de bugün deprem, yangın ve önemli haberleri karşılaştır.">Türkiye risk özeti</button>
+          <button class="chip" data-q="Ege'de uçuş, deprem ve hava olayları arasında dikkat çeken bir korelasyon var mı?">Ege korelasyon</button>
+          <button class="chip" data-q="Dünya genelinde son gelişmelerden en kritik 5 olayı kanıtlarıyla sırala.">Global critical 5</button>
+        </div>
+
+        <div class="pipeline" id="pipeline"></div>
+      </section>
+
+      <section class="panel map-panel">
+        <div class="panel-head"><div><div class="eyebrow">COMMON OPERATING PICTURE</div><strong>Live Intelligence Map</strong></div><span id="mapCount" class="counter">0 entities</span></div>
+        <div id="map"></div>
+        <div class="map-legend"><span><i class="dot quake"></i> Seismic</span><span><i class="dot fire"></i> Fire</span><span><i class="dot flight"></i> Aviation</span><span><i class="dot intel"></i> Intel</span></div>
+      </section>
+
+      <section class="panel result-panel">
+        <div class="panel-head"><div><div class="eyebrow">AI ASSESSMENT</div><strong>Investigation Result</strong></div><span id="confidence" class="score">—</span></div>
+        <div id="summary" class="summary empty">Henüz araştırma başlatılmadı.</div>
+        <div class="subhead">Evidence</div>
+        <div id="evidence" class="evidence-list"></div>
+      </section>
+
+      <section class="panel seal-panel">
+        <div class="panel-head"><div><div class="eyebrow">SEAL SECURITY LAYER</div><strong>Authorization Receipt</strong></div><span id="sealState" class="seal-ok">READY</span></div>
+        <dl class="receipt">
+          <div><dt>Intent ID</dt><dd id="intentId">—</dd></div>
+          <div><dt>Allowed Tools</dt><dd id="allowedTools">—</dd></div>
+          <div><dt>Executed Tools</dt><dd id="executedTools">—</dd></div>
+          <div><dt>Evidence Digest</dt><dd id="digest">—</dd></div>
+          <div><dt>Policy</dt><dd>READ-ONLY / PASSIVE</dd></div>
+          <div><dt>Effect Match</dt><dd id="effectMatch">—</dd></div>
+        </dl>
+      </section>
+    </main>
+
+    <footer>OSIRIS FUSION DEMO · Passive public OSINT only · Active scan / exploitation disabled by policy</footer>
+  </div>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <script src="./app.js"></script>
+</body>
+</html>

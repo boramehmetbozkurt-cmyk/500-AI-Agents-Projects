@@ -1,9 +1,11 @@
-name: Deploy React Atlas to GitHub Pages
+name: Deploy OSIRIS Fusion Demo to GitHub Pages
 
-# GitHub Pages is not enabled for this fork. Keep the deployment workflow
-# available for manual use, but do not run it automatically on OSIRIS or
-# unrelated repository changes. This prevents false-negative CI emails.
 on:
+  push:
+    branches: ["main"]
+    paths:
+      - "osiris_ai_fusion/demo/**"
+      - ".github/workflows/jekyll-gh-pages.yml"
   workflow_dispatch:
 
 permissions:
@@ -12,8 +14,8 @@ permissions:
   id-token: write
 
 concurrency:
-  group: "pages"
-  cancel-in-progress: false
+  group: "osiris-fusion-pages"
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -22,26 +24,21 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-
-      - name: Setup Pages
+      - name: Configure Pages
         uses: actions/configure-pages@v5
+        with:
+          enablement: true
 
-      - name: Install website dependencies
-        run: npm install
-        working-directory: web
+      - name: Verify demo files
+        run: |
+          test -f osiris_ai_fusion/demo/index.html
+          test -f osiris_ai_fusion/demo/app.js
+          test -f osiris_ai_fusion/demo/styles.css
 
-      - name: Build React atlas
-        run: npm run build
-        working-directory: web
-
-      - name: Upload Pages artifact
+      - name: Upload OSIRIS Fusion demo
         uses: actions/upload-pages-artifact@v3
         with:
-          path: web/dist
+          path: osiris_ai_fusion/demo
 
   deploy:
     environment:
