@@ -1,16 +1,9 @@
 name: Deploy React Atlas to GitHub Pages
 
+# GitHub Pages is not enabled for this fork. Keep the deployment workflow
+# available for manual use, but do not run it automatically on OSIRIS or
+# unrelated repository changes. This prevents false-negative CI emails.
 on:
-  push:
-    branches: ["main"]
-  pull_request:
-    branches: ["main"]
-    paths:
-      - "web/**"
-      - "README.md"
-      - "agents/**"
-      - "crewai_mcp_course/**"
-      - ".github/workflows/jekyll-gh-pages.yml"
   workflow_dispatch:
 
 permissions:
@@ -51,7 +44,6 @@ jobs:
           path: web/dist
 
   deploy:
-    if: github.event_name != 'pull_request'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
