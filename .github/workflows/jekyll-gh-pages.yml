@@ -1,11 +1,10 @@
 name: Deploy OSIRIS Fusion Demo to GitHub Pages
 
+# GitHub Pages is not yet enabled for this repository and the connected GitHub
+# integration cannot change that repository-level setting. Keep deployment
+# available for manual use after Pages is enabled, but never auto-run and send
+# false failure notifications on normal OSIRIS changes.
 on:
-  push:
-    branches: ["main"]
-    paths:
-      - "osiris_ai_fusion/demo/**"
-      - ".github/workflows/jekyll-gh-pages.yml"
   workflow_dispatch:
 
 permissions:
@@ -26,8 +25,6 @@ jobs:
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
-        with:
-          enablement: true
 
       - name: Verify demo files
         run: |
