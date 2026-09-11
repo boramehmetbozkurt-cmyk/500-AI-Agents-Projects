@@ -4,13 +4,22 @@ import argparse
 import asyncio
 import json
 import sys
+from pathlib import Path
 
-from osiris_client import OsirisClient
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from osiris_client import OsirisClient  # noqa: E402
 
 
 async def run(base_url: str, timeout: float) -> int:
     try:
-        async with OsirisClient(base_url=base_url, timeout=timeout, max_response_bytes=2_000_000) as client:
+        async with OsirisClient(
+            base_url=base_url,
+            timeout=timeout,
+            max_response_bytes=2_000_000,
+        ) as client:
             probe = await client.passive_contract_probe()
     except Exception as exc:
         print(json.dumps({"status": "failed", "error": f"{type(exc).__name__}: {exc}"}))
