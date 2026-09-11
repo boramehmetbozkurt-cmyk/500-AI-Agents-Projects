@@ -1,0 +1,3 @@
+-r requirements.txt
+# Optional specialist-agent layer. Keep out of the runtime until a worker truly needs it.
+smolagents>=1.0,<3.0
