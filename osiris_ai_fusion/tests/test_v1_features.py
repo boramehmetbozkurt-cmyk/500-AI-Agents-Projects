@@ -198,14 +198,10 @@ def test_provider_manifest_can_add_multiple_providers(monkeypatch, tmp_path):
 def test_general_web_is_fallback_not_central_router(monkeypatch):
     monkeypatch.setenv("FUSION_WEB_SEARCH_URL", "https://example.invalid/search")
     monkeypatch.delenv("FUSION_NEWS_URL", raising=False)
-    routed = [
-        provider.provider_id
-        for provider in route_providers("Bugün tamamen yeni bir olay hakkında ne oldu?")
-    ]
+    query = "Bugün Zorblax-99 olayı gerçekleşti mi?"
+    routed = [provider.provider_id for provider in route_providers(query)]
     assert routed == ["general_web"]
-    assert deterministic_tools("Bugün tamamen yeni bir olay hakkında ne oldu?") == [
-        "provider_federation"
-    ]
+    assert deterministic_tools(query) == ["provider_federation"]
 
 
 def test_generic_fresh_finance_query_uses_federation(monkeypatch):
