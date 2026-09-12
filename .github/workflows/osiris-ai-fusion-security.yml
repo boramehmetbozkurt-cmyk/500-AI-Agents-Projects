@@ -6,7 +6,10 @@ on:
       - "osiris_ai_fusion/**"
       - ".github/workflows/osiris-ai-fusion-security.yml"
   push:
-    branches: [main, osiris-fusion-v1-release]
+    branches:
+      - main
+      - osiris-fusion-v1-release
+      - osiris-fusion-universal-capabilities
     paths:
       - "osiris_ai_fusion/**"
       - ".github/workflows/osiris-ai-fusion-security.yml"

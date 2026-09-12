@@ -13,11 +13,19 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
+from capabilities import (
+    auto_tool_names,
+    capability_catalog,
+    infer_capability_names,
+    likely_requires_external_data,
+    resolve_capability_gap,
+)
 from config import get_settings
 from graph import investigate, investigate_stream
 from llm import ModelRouter
 from metrics import metrics
 from osiris_client import FORBIDDEN_ACTIVE_PATHS, READ_ONLY_TOOLS, OsirisClient, tool_catalog
+from planner import deterministic_tools
 from rate_limit import InMemoryRateLimiter
 from schemas import CaseCreate, InvestigationRequestModel, WatchlistCreate
 from seal import verify_receipt
@@ -48,8 +56,11 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(
     title="OSIRIS Fusion",
-    version="1.0.0",
-    description="Evidence-first, authorization-aware, read-only AI intelligence operating system.",
+    version="1.1.0",
+    description=(
+        "Evidence-first, authorization-aware AI intelligence operating system with "
+        "discoverable read-only capabilities and connector fallbacks."
+    ),
     lifespan=lifespan,
 )
 
@@ -127,18 +138,28 @@ async def health() -> dict[str, Any]:
 
 @app.get("/ready")
 async def ready(_: str = Depends(require_api_key)) -> dict[str, Any]:
-    result: dict[str, Any] = {"status": "ready", "dependencies": {}}
+    result: dict[str, Any] = {
+        "status": "ready",
+        "dependencies": {},
+        "capabilities_ready": sorted(auto_tool_names()),
+    }
     try:
         async with OsirisClient() as client:
             result["dependencies"]["osiris"] = await client.health()
     except Exception as exc:
         result["status"] = "degraded"
-        result["dependencies"]["osiris"] = {"status": "unreachable", "error_type": type(exc).__name__}
+        result["dependencies"]["osiris"] = {
+            "status": "unreachable",
+            "error_type": type(exc).__name__,
+        }
     try:
         result["dependencies"]["llm"] = await ModelRouter().health()
     except Exception as exc:
         result["status"] = "degraded"
-        result["dependencies"]["llm"] = {"status": "unreachable", "error_type": type(exc).__name__}
+        result["dependencies"]["llm"] = {
+            "status": "unreachable",
+            "error_type": type(exc).__name__,
+        }
     return result
 
 
@@ -155,24 +176,64 @@ async def tools(_: str = Depends(require_api_key)) -> dict[str, Any]:
         "tools": tool_catalog(),
         "forbidden_active_paths": sorted(FORBIDDEN_ACTIVE_PATHS),
         "excluded_capabilities": [
-            "active_scanning", "exploitation", "credential_access",
-            "intrusive_surveillance", "face_recognition_tracking",
+            "active_scanning",
+            "exploitation",
+            "credential_access",
+            "intrusive_surveillance",
+            "face_recognition_tracking",
         ],
+    }
+
+
+@app.get("/capabilities")
+async def capabilities(_: str = Depends(require_api_key)) -> dict[str, Any]:
+    rows = capability_catalog()
+    return {
+        "version": "1.1",
+        "mode": "discoverable-read-only",
+        "ready": [row["name"] for row in rows if row.get("ready")],
+        "capabilities": rows,
+        "rule": (
+            "Only ready, read-only, auto_execute capabilities can run autonomously. "
+            "Action connectors must remain approval-gated."
+        ),
+    }
+
+
+@app.get("/capabilities/resolve")
+async def resolve_capabilities(
+    query: str = Query(min_length=3, max_length=4000),
+    _: str = Depends(require_api_key),
+) -> dict[str, Any]:
+    inferred = infer_capability_names(query)
+    selected = deterministic_tools(query)
+    return {
+        "query": query,
+        "selected": selected,
+        "specialized_inference": inferred,
+        "external_data_likely_required": likely_requires_external_data(query),
+        "capability_gaps": resolve_capability_gap(query, inferred),
+        "ready_capabilities": sorted(auto_tool_names()),
     }
 
 
 @app.get("/providers")
 async def providers(_: str = Depends(require_api_key)) -> dict[str, Any]:
+    all_tools = sorted(auto_tool_names() | set(READ_ONLY_TOOLS))
     return {
         "commercial_mode": settings.commercial_mode,
         "strict_commercial_sources": settings.strict_commercial_sources,
         "licensed_providers": sorted(settings.licensed_providers),
-        "policies": policy_report(READ_ONLY_TOOLS),
+        "policies": policy_report(all_tools),
     }
 
 
 @app.post("/investigate")
-async def investigate_route(body: InvestigationRequestModel, request: Request, _: str = Depends(require_api_key)):
+async def investigate_route(
+    body: InvestigationRequestModel,
+    request: Request,
+    _: str = Depends(require_api_key),
+):
     investigation_id = ""
     if body.save:
         investigation_id = store.start_investigation(
@@ -207,7 +268,10 @@ async def investigate_route(body: InvestigationRequestModel, request: Request, _
 
 
 @app.post("/investigate/stream")
-async def investigate_stream_route(body: InvestigationRequestModel, _: str = Depends(require_api_key)):
+async def investigate_stream_route(
+    body: InvestigationRequestModel,
+    _: str = Depends(require_api_key),
+):
     investigation_id = ""
     if body.save:
         investigation_id = store.start_investigation(
@@ -234,14 +298,21 @@ async def investigate_stream_route(body: InvestigationRequestModel, _: str = Dep
         except Exception as exc:
             if investigation_id:
                 store.fail_investigation(investigation_id, type(exc).__name__)
-            payload = {"stage": "error", "error": type(exc).__name__, "detail": str(exc)[:500]}
+            payload = {
+                "stage": "error",
+                "error": type(exc).__name__,
+                "detail": str(exc)[:500],
+            }
             yield "event: fusion\ndata: " + json.dumps(payload, ensure_ascii=False) + "\n\n"
 
     return StreamingResponse(events(), media_type="text/event-stream")
 
 
 @app.post("/receipts/verify")
-async def receipt_verify(receipt: dict[str, Any], _: str = Depends(require_api_key)) -> dict[str, bool]:
+async def receipt_verify(
+    receipt: dict[str, Any],
+    _: str = Depends(require_api_key),
+) -> dict[str, bool]:
     return {"valid_signature": verify_receipt(receipt)}
 
 
@@ -251,32 +322,50 @@ async def create_case(body: CaseCreate, _: str = Depends(require_api_key)) -> di
 
 
 @app.get("/cases")
-async def list_cases(workspace_id: str = Query(default="default", max_length=100), _: str = Depends(require_api_key)) -> list[dict[str, Any]]:
+async def list_cases(
+    workspace_id: str = Query(default="default", max_length=100),
+    _: str = Depends(require_api_key),
+) -> list[dict[str, Any]]:
     return store.list_cases(workspace_id)
 
 
 @app.get("/investigations")
-async def list_investigations(workspace_id: str = Query(default="default", max_length=100), _: str = Depends(require_api_key)) -> list[dict[str, Any]]:
+async def list_investigations(
+    workspace_id: str = Query(default="default", max_length=100),
+    _: str = Depends(require_api_key),
+) -> list[dict[str, Any]]:
     return store.list_investigations(workspace_id)
 
 
 @app.post("/watchlists")
-async def create_watchlist(body: WatchlistCreate, _: str = Depends(require_api_key)) -> dict[str, Any]:
+async def create_watchlist(
+    body: WatchlistCreate,
+    _: str = Depends(require_api_key),
+) -> dict[str, Any]:
     return store.create_watchlist(body.model_dump())
 
 
 @app.get("/watchlists")
-async def list_watchlists(workspace_id: str = Query(default="default", max_length=100), _: str = Depends(require_api_key)) -> list[dict[str, Any]]:
+async def list_watchlists(
+    workspace_id: str = Query(default="default", max_length=100),
+    _: str = Depends(require_api_key),
+) -> list[dict[str, Any]]:
     return store.list_watchlists(workspace_id)
 
 
 @app.get("/alerts")
-async def list_alerts(workspace_id: str = Query(default="default", max_length=100), _: str = Depends(require_api_key)) -> list[dict[str, Any]]:
+async def list_alerts(
+    workspace_id: str = Query(default="default", max_length=100),
+    _: str = Depends(require_api_key),
+) -> list[dict[str, Any]]:
     return store.list_alerts(workspace_id)
 
 
 @app.post("/alerts/{alert_id}/ack")
-async def acknowledge_alert(alert_id: str, _: str = Depends(require_api_key)) -> dict[str, bool]:
+async def acknowledge_alert(
+    alert_id: str,
+    _: str = Depends(require_api_key),
+) -> dict[str, bool]:
     return {"acknowledged": store.acknowledge_alert(alert_id)}
 
 

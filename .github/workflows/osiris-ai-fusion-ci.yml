@@ -6,7 +6,11 @@ on:
       - "osiris_ai_fusion/**"
       - ".github/workflows/osiris-ai-fusion-ci.yml"
   push:
-    branches: [main, osiris-ai-fusion-production, osiris-fusion-v1-release]
+    branches:
+      - main
+      - osiris-ai-fusion-production
+      - osiris-fusion-v1-release
+      - osiris-fusion-universal-capabilities
     paths:
       - "osiris_ai_fusion/**"
       - ".github/workflows/osiris-ai-fusion-ci.yml"
@@ -46,4 +50,4 @@ jobs:
         env:
           UI_ENABLED: "true"
           AI_PLANNER_ENABLED: "false"
-        run: python -c "import app; assert app.app.version == '1.0.0'"
+        run: python -c "import app; assert app.app.version == '1.1.0'"
