@@ -6,7 +6,7 @@ on:
       - "osiris_ai_fusion/**"
       - ".github/workflows/osiris-ai-fusion-security.yml"
   push:
-    branches: [main]
+    branches: [main, osiris-fusion-v1-release]
     paths:
       - "osiris_ai_fusion/**"
       - ".github/workflows/osiris-ai-fusion-security.yml"
@@ -36,3 +36,5 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build hardened container
         run: docker build --pull -t osiris-ai-fusion:ci osiris_ai_fusion
+      - name: Inspect non-root runtime user
+        run: docker run --rm --entrypoint sh osiris-ai-fusion:ci -c 'test "$(id -u)" = "10001"'

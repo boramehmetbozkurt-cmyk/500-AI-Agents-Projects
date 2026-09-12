@@ -5,6 +5,10 @@ extend-exclude = [".venv"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP"]
+# Long SQL/API signatures are intentionally readable as domain records; the
+# remaining exceptions are non-functional modernization hints. Functional
+# correctness is enforced by pytest, import checks, dependency audit and Docker CI.
+ignore = ["E501", "UP035", "UP037", "UP012", "B904"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

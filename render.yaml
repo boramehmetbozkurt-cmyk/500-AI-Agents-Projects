@@ -1,0 +1,43 @@
+services:
+  - type: web
+    name: osiris-fusion
+    runtime: docker
+    branch: osiris-fusion-v1-release
+    rootDir: osiris_ai_fusion
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: UI_ENABLED
+        value: "true"
+      - key: AI_PLANNER_ENABLED
+        value: "true"
+      - key: COMMERCIAL_MODE
+        value: "false"
+      - key: STRICT_COMMERCIAL_SOURCES
+        value: "true"
+      - key: WATCHER_ENABLED
+        value: "false"
+      - key: FUSION_STORE_PATH
+        value: /var/lib/osiris-fusion/fusion.sqlite3
+      - key: SEAL_REPLAY_DB
+        value: /var/lib/osiris-fusion/seal-replay.sqlite3
+      - key: OSIRIS_FUSION_API_KEY
+        generateValue: true
+      - key: SEAL_ED25519_PRIVATE_KEY_B64
+        sync: false
+      - key: REQUIRE_SIGNED_RECEIPTS
+        value: "false"
+      - key: LLM_FALLBACK_BASE_URL
+        sync: false
+      - key: LLM_FALLBACK_API_KEY
+        sync: false
+      - key: LLM_FALLBACK_MODEL
+        sync: false
+    disk:
+      name: osiris-fusion-data
+      mountPath: /var/lib/osiris-fusion
+      sizeGB: 1

@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import json
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import lru_cache
+from pathlib import Path
 
 
 def _bool(name: str, default: bool = False) -> bool:
@@ -22,26 +24,86 @@ def _float(name: str, default: float) -> float:
     return float(raw) if raw is not None else default
 
 
+def _set(name: str) -> frozenset[str]:
+    raw = os.getenv(name, "")
+    return frozenset(item.strip().lower() for item in raw.split(",") if item.strip())
+
+
+def _origins() -> tuple[str, ...]:
+    raw = os.getenv("CORS_ORIGINS", "")
+    if not raw:
+        return ()
+    if raw.lstrip().startswith("["):
+        return tuple(str(item) for item in json.loads(raw))
+    return tuple(item.strip() for item in raw.split(",") if item.strip())
+
+
 @dataclass(frozen=True)
 class Settings:
-    app_env: str = os.getenv("APP_ENV", "development").strip().lower()
-    api_key: str = os.getenv("OSIRIS_FUSION_API_KEY", "").strip()
-    osiris_base_url: str = os.getenv("OSIRIS_BASE_URL", "https://osirisai.live").rstrip("/")
-    ollama_base_url: str = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434").rstrip("/")
-    llm_model: str = os.getenv("LLM_MODEL", "qwen2.5:7b").strip()
-    fallback_base_url: str = os.getenv("LLM_FALLBACK_BASE_URL", "").rstrip("/")
-    fallback_api_key: str = os.getenv("LLM_FALLBACK_API_KEY", "").strip()
-    fallback_model: str = os.getenv("LLM_FALLBACK_MODEL", "").strip()
-    tool_timeout_seconds: float = _float("TOOL_TIMEOUT_SECONDS", 20.0)
-    llm_timeout_seconds: float = _float("LLM_TIMEOUT_SECONDS", 120.0)
-    max_parallel_tools: int = _int("MAX_PARALLEL_TOOLS", 5)
-    max_evidence_bytes: int = _int("MAX_EVIDENCE_BYTES", 1_500_000)
-    max_prompt_evidence_chars: int = _int("MAX_PROMPT_EVIDENCE_CHARS", 50_000)
-    max_tool_calls: int = _int("MAX_TOOL_CALLS", 8)
-    seal_ttl_seconds: int = _int("SEAL_TTL_SECONDS", 300)
-    seal_replay_db: str = os.getenv("SEAL_REPLAY_DB", ".seal_replay.sqlite3")
-    request_limit_per_minute: int = _int("REQUEST_LIMIT_PER_MINUTE", 30)
-    require_signed_receipts: bool = _bool("REQUIRE_SIGNED_RECEIPTS", False)
+    app_env: str = field(
+        default_factory=lambda: os.getenv("APP_ENV", "development").strip().lower()
+    )
+    api_key: str = field(default_factory=lambda: os.getenv("OSIRIS_FUSION_API_KEY", "").strip())
+    osiris_base_url: str = field(
+        default_factory=lambda: os.getenv("OSIRIS_BASE_URL", "https://osirisai.live").rstrip("/")
+    )
+    ollama_base_url: str = field(
+        default_factory=lambda: os.getenv("OLLAMA_BASE_URL", "http://localhost:11434").rstrip("/")
+    )
+    llm_model: str = field(default_factory=lambda: os.getenv("LLM_MODEL", "qwen3:4b").strip())
+    llm_think: bool = field(default_factory=lambda: _bool("LLM_THINK", False))
+    fallback_base_url: str = field(
+        default_factory=lambda: os.getenv("LLM_FALLBACK_BASE_URL", "").rstrip("/")
+    )
+    fallback_api_key: str = field(
+        default_factory=lambda: os.getenv("LLM_FALLBACK_API_KEY", "").strip()
+    )
+    fallback_model: str = field(
+        default_factory=lambda: os.getenv("LLM_FALLBACK_MODEL", "").strip()
+    )
+    ai_planner_enabled: bool = field(default_factory=lambda: _bool("AI_PLANNER_ENABLED", True))
+    tool_timeout_seconds: float = field(
+        default_factory=lambda: _float("TOOL_TIMEOUT_SECONDS", 20.0)
+    )
+    llm_timeout_seconds: float = field(
+        default_factory=lambda: _float("LLM_TIMEOUT_SECONDS", 120.0)
+    )
+    max_parallel_tools: int = field(default_factory=lambda: _int("MAX_PARALLEL_TOOLS", 5))
+    max_evidence_bytes: int = field(
+        default_factory=lambda: _int("MAX_EVIDENCE_BYTES", 1_500_000)
+    )
+    max_prompt_evidence_chars: int = field(
+        default_factory=lambda: _int("MAX_PROMPT_EVIDENCE_CHARS", 60_000)
+    )
+    max_tool_calls: int = field(default_factory=lambda: _int("MAX_TOOL_CALLS", 8))
+    seal_ttl_seconds: int = field(default_factory=lambda: _int("SEAL_TTL_SECONDS", 300))
+    seal_replay_db: str = field(
+        default_factory=lambda: os.getenv("SEAL_REPLAY_DB", ".seal_replay.sqlite3")
+    )
+    request_limit_per_minute: int = field(
+        default_factory=lambda: _int("REQUEST_LIMIT_PER_MINUTE", 30)
+    )
+    require_signed_receipts: bool = field(
+        default_factory=lambda: _bool("REQUIRE_SIGNED_RECEIPTS", False)
+    )
+    store_path: str = field(
+        default_factory=lambda: os.getenv("FUSION_STORE_PATH", "fusion.sqlite3")
+    )
+    watcher_enabled: bool = field(default_factory=lambda: _bool("WATCHER_ENABLED", False))
+    watcher_poll_seconds: int = field(
+        default_factory=lambda: _int("WATCHER_POLL_SECONDS", 300)
+    )
+    commercial_mode: bool = field(default_factory=lambda: _bool("COMMERCIAL_MODE", False))
+    strict_commercial_sources: bool = field(
+        default_factory=lambda: _bool("STRICT_COMMERCIAL_SOURCES", True)
+    )
+    licensed_providers: frozenset[str] = field(default_factory=lambda: _set("LICENSED_PROVIDERS"))
+    cors_origins: tuple[str, ...] = field(default_factory=_origins)
+    ui_enabled: bool = field(default_factory=lambda: _bool("UI_ENABLED", True))
+
+    @property
+    def ui_dir(self) -> Path:
+        return Path(__file__).resolve().parent / "ui"
 
     def validate(self) -> None:
         if self.app_env == "production":
@@ -59,6 +121,8 @@ class Settings:
             raise RuntimeError("MAX_TOOL_CALLS must be >= 1")
         if self.max_evidence_bytes < 10_000:
             raise RuntimeError("MAX_EVIDENCE_BYTES is too small")
+        if self.watcher_poll_seconds < 60:
+            raise RuntimeError("WATCHER_POLL_SECONDS must be >= 60")
 
 
 @lru_cache(maxsize=1)
