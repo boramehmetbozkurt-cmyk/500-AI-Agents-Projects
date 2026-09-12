@@ -4,6 +4,13 @@ import json
 import re
 from typing import Any
 
+from capabilities import (
+    auto_tool_names,
+    capability_specs,
+    infer_capability_names,
+    likely_requires_external_data,
+    resolve_capability_gap,
+)
 from config import get_settings
 from llm import ModelRouter
 from osiris_client import READ_ONLY_TOOLS, normalize_tool_name
@@ -55,6 +62,10 @@ KEYWORD_TOOL_MAP = {
     "malware": "malware",
 }
 
+OSINT_BROAD_TERMS = {
+    "olağandışı", "anomali", "risk", "tehdit", "olay", "gelişme", "brief",
+    "intelligence", "osint", "ülke", "bölge", "region", "threat", "incident",
+}
 DEFAULT_TOOL_SET = {"earthquakes", "fires", "weather", "gdelt", "news", "country_risk"}
 
 
@@ -95,15 +106,26 @@ def infer_time_range(query: str) -> str | None:
 def deterministic_tools(query: str, requested_tools: list[str] | None = None) -> list[str]:
     settings = get_settings()
     q = query.lower()
-    selected = {tool for keyword, tool in KEYWORD_TOOL_MAP.items() if keyword in q}
+    available = auto_tool_names()
+
+    native = {tool for keyword, tool in KEYWORD_TOOL_MAP.items() if keyword in q}
+    capabilities = {name for name in infer_capability_names(query) if name in available}
+    selected = native | capabilities
+
+    if not selected and any(term in q for term in OSINT_BROAD_TERMS):
+        selected = DEFAULT_TOOL_SET & available
+
+    if not selected and likely_requires_external_data(query) and "web_search" in available:
+        selected = {"web_search"}
+
     if not selected:
-        selected = set(DEFAULT_TOOL_SET)
+        selected = {"direct_reasoning"} if "direct_reasoning" in available else set()
 
     if requested_tools is not None:
         requested = {normalize_tool_name(tool) for tool in requested_tools}
-        unknown = requested.difference(READ_ONLY_TOOLS)
+        unknown = requested.difference(available)
         if unknown:
-            raise PermissionError(f"Unknown or non-read-only tools requested: {sorted(unknown)}")
+            raise PermissionError(f"Unknown, unavailable, or non-read-only tools requested: {sorted(unknown)}")
         selected &= requested
         if not selected and requested:
             selected = requested
@@ -117,24 +139,27 @@ async def build_plan(
     scope: dict[str, Any],
 ) -> tuple[InvestigationPlan, dict[str, str]]:
     settings = get_settings()
+    available = auto_tool_names()
     tools = deterministic_tools(query, requested_tools)
     region = scope.get("region")
     time_range = scope.get("time_range") or infer_time_range(query)
     question_type = infer_question_type(query)
-    model_meta = {"provider": "deterministic", "model": "rules+policy"}
+    model_meta = {"provider": "deterministic", "model": "capability-router-v1"}
 
     if settings.ai_planner_enabled and requested_tools is None:
         system = (
-            "You are an OSINT query planner. Return only JSON matching the supplied schema. "
-            "Select only tools from AVAILABLE_TOOLS. Never request active scanning, exploitation, "
-            "credential access, facial tracking, or intrusive surveillance."
+            "You are OSIRIS Fusion's universal capability planner. Return only JSON matching the schema. "
+            "Select only from AVAILABLE_TOOLS. Use the smallest sufficient set. Use direct_reasoning for "
+            "drafting, rewriting, ideation and stable reasoning tasks. Use web_search for fresh public facts "
+            "when it is available. Use specialized connectors such as sports_research when relevant. Never "
+            "request active scanning, exploitation, credential access, facial tracking or intrusive surveillance."
         )
         prompt = (
             f"QUERY: {query}\n"
             f"USER_SCOPE: {json.dumps(scope, ensure_ascii=False)}\n"
-            f"AVAILABLE_TOOLS: {', '.join(sorted(READ_ONLY_TOOLS))}\n"
+            f"AVAILABLE_TOOLS: {', '.join(sorted(available))}\n"
             f"MAX_TOOL_CALLS: {settings.max_tool_calls}\n"
-            "Choose the smallest sufficient set of tools."
+            "If a requested external capability is unavailable, do not invent a tool name."
         )
         try:
             payload, model_result = await ModelRouter().generate_json(
@@ -144,7 +169,7 @@ async def build_plan(
             )
             candidate = InvestigationPlan.model_validate(payload)
             normalized = [normalize_tool_name(item) for item in candidate.tools]
-            valid = [item for item in normalized if item in READ_ONLY_TOOLS]
+            valid = [item for item in normalized if item in available]
             if valid:
                 tools = valid[: settings.max_tool_calls]
                 region = candidate.region or region
@@ -155,19 +180,24 @@ async def build_plan(
             pass
 
     allowed, warnings = enforce_source_policy(tools)
-    if not allowed:
-        detail = "; ".join(warnings)
+    gaps = resolve_capability_gap(query, infer_capability_names(query))
+    if tools and not allowed:
+        detail = "; ".join(warnings + gaps)
         raise PermissionError(
             "No tools remain after source-license/commercial policy enforcement: " + detail
         )
+
+    rationale = "Universal capability router selected the smallest authorized read-only tool set."
+    if gaps:
+        rationale += " Capability gaps: " + "; ".join(gaps)
 
     plan = InvestigationPlan(
         question_type=question_type,
         region=region,
         time_range=time_range,
         tools=allowed,
-        rationale="Smallest authorized passive OSINT tool set selected for the query.",
+        rationale=rationale,
         max_tool_calls=min(settings.max_tool_calls, len(allowed)),
-        commercial_warnings=warnings,
+        commercial_warnings=warnings + gaps,
     )
     return plan, model_meta
