@@ -12,7 +12,7 @@ from capabilities import (
 )
 from config import get_settings
 from llm import ModelRouter
-from osiris_client import READ_ONLY_TOOLS, normalize_tool_name
+from osiris_client import normalize_tool_name
 from schemas import InvestigationPlan
 from source_policy import enforce_source_policy
 
