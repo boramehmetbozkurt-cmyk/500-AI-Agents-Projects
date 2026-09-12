@@ -10,6 +10,7 @@ on:
       - main
       - osiris-fusion-v1-release
       - osiris-fusion-universal-capabilities
+      - osiris-fusion-provider-federation
     paths:
       - "osiris_ai_fusion/**"
       - ".github/workflows/osiris-ai-fusion-security.yml"
