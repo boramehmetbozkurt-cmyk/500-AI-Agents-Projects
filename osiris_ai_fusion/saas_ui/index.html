@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="OSIRIS Fusion — evidence-first multi-provider AI research SaaS with Fusion Atlas">
+  <title>OSIRIS Fusion — Public Intelligence SaaS</title>
+  <link rel="stylesheet" href="/saas-assets/styles.css">
+</head>
+<body>
+  <div class="noise"></div>
+  <header class="nav shell">
+    <a class="brand" href="/"><span class="sigil">O</span><span>OSIRIS <b>FUSION</b></span></a>
+    <nav>
+      <a href="#product">Ürün</a><a href="/assets/atlas.html">Atlas</a><a href="#plans">Planlar</a><a href="/docs">API</a>
+      <button id="accountBtn" class="ghost">Giriş</button>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero shell">
+      <div class="hero-copy">
+        <div class="eyebrow"><span class="live-dot"></span> PUBLIC SaaS · PROVIDER FEDERATION · SEAL BOUNDARY</div>
+        <h1>Tek arama kutusu.<br><span>Birden fazla canlı kaynak.</span></h1>
+        <p>Haber, bilim, harita, finans, kripto, spor ve özel veri sağlayıcılarını tek kanıt zincirinde birleştiren, pasif/read-only araştırma işletim sistemi.</p>
+        <div class="actions">
+          <button id="startBtn" class="primary">Ücretsiz başla</button>
+          <a class="secondary" href="/assets/atlas.html">Fusion Atlas'ı aç</a>
+        </div>
+        <div class="trust-row"><span>✓ Tenant izolasyonu</span><span>✓ Kaynak/provenance</span><span>✓ 6 Atlas haritası</span><span>✓ Kota & billing</span></div>
+      </div>
+      <div class="terminal-card">
+        <div class="terminal-top"><span></span><span></span><span></span><code>fusion://research</code></div>
+        <div class="terminal-body">
+          <p class="muted">QUERY</p>
+          <p class="query">“İzmir ve Ege Bölgesi'nde son 24 saatte olağandışı ne oldu?”</p>
+          <div class="flow"><b>01</b><span>Intent sealed</span><i>PASS</i></div>
+          <div class="flow"><b>02</b><span>Provider federation</span><i>5 READY</i></div>
+          <div class="flow"><b>03</b><span>Evidence normalization</span><i>BOUND</i></div>
+          <div class="flow"><b>04</b><span>Correlation + synthesis</span><i>READ-ONLY</i></div>
+          <div class="receipt"><small>RECEIPT</small><code>sha256:9d31…a842</code><strong>effect_match=true</strong></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="product" class="section shell">
+      <div class="section-head"><span>PRODUCT</span><h2>Araştırmayı tek kaynağa mahkûm etmez.</h2><p>Aynı sorguyu uygun sağlayıcılara paralel yönlendirir, kanıtı normalize eder ve hangi sonucun hangi kaynaktan geldiğini saklar.</p></div>
+      <div class="grid features">
+        <article><b>01</b><h3>Multi-provider fan-out</h3><p>Alan bazlı kaynak seçimi. Genel web yalnızca daha güçlü özel kaynak yoksa fallback.</p></article>
+        <article><b>02</b><h3>Evidence-first</h3><p>Her iddia kanıt kaydı, URL, zaman damgası ve digest ile izlenebilir.</p></article>
+        <article><b>03</b><h3>Tenant güvenliği</h3><p>Workspace kimliği kullanıcı girdisinden değil oturum/API anahtarından türetilir.</p></article>
+        <article><b>04</b><h3>SEAL boundary</h3><p>Otonom çalışma pasif/read-only kalır; aktif tarama ve yan etkili işlemler dışarıdadır.</p></article>
+        <article><b>05</b><h3>Fusion Atlas</h3><p>AI Universe, AI Gene, AGI Capability, Meta Universe, BTC Universe ve Money Universe kaynaklı bilgi grafları.</p></article>
+      </div>
+    </section>
+
+    <section id="plans" class="section shell">
+      <div class="section-head"><span>PRICING</span><h2>Başla, sonra ölçekle.</h2><p>Plan limitleri backend tarafından uygulanır. Stripe bağlandığında Pro ve Team checkout otomatik açılır.</p></div>
+      <div id="planGrid" class="grid plans"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div>
+    </section>
+
+    <section class="section shell security">
+      <div><span class="eyebrow">SECURITY MODEL</span><h2>Public olması, açık hedef olması demek değil.</h2></div>
+      <div class="security-list"><p><b>Passwords</b><span>scrypt + random salt; raw parola saklanmaz.</span></p><p><b>Sessions</b><span>Random bearer token; veritabanında yalnız SHA-256 özeti.</span></p><p><b>API keys</b><span>Raw değer yalnız oluşturulurken gösterilir; sonrasında hash.</span></p><p><b>Tenant scope</b><span>Case, watchlist, history ve alerts tenant ID ile zorlanır.</span></p></div>
+    </section>
+  </main>
+
+  <footer class="shell footer"><span>OSIRIS FUSION</span><span>Passive / read-only research infrastructure</span><span>v1.3</span></footer>
+
+  <div id="modal" class="modal hidden" aria-hidden="true">
+    <div class="modal-card">
+      <button id="closeModal" class="close" aria-label="Kapat">×</button>
+      <div id="authView">
+        <div class="tabs"><button id="loginTab" class="active">Giriş</button><button id="signupTab">Kayıt</button></div>
+        <form id="authForm">
+          <label id="nameLabel" class="hidden">Ad<input id="nameInput" autocomplete="name" maxlength="120"></label>
+          <label id="orgLabel" class="hidden">Organizasyon<input id="orgInput" autocomplete="organization" maxlength="120"></label>
+          <label>E-posta<input id="emailInput" type="email" autocomplete="email" required></label>
+          <label>Şifre<input id="passwordInput" type="password" autocomplete="current-password" minlength="12" required></label>
+          <button id="authSubmit" class="primary wide" type="submit">Giriş yap</button>
+          <p id="authError" class="error"></p>
+        </form>
+      </div>
+      <div id="dashboardView" class="hidden">
+        <div class="dash-head"><div><small>WORKSPACE</small><h2 id="workspaceName">—</h2></div><span id="planBadge" class="plan-badge">FREE</span></div>
+        <div class="usage-card"><div><small>AYLIK ARAŞTIRMA</small><strong id="usageText">—</strong></div><div class="meter"><i id="usageMeter"></i></div></div>
+        <div class="dash-actions"><button id="newKeyBtn" class="secondary">+ API anahtarı</button><button id="launchBtn" class="primary">Command Center</button></div>
+        <div id="newKeyReveal" class="key-reveal hidden"><small>BU DEĞER BİR DAHA GÖSTERİLMEZ</small><code id="rawKey"></code><button id="copyKeyBtn" class="ghost">Kopyala</button></div>
+        <div class="key-list"><div class="row-title"><h3>API anahtarları</h3><span id="keyCount">0</span></div><div id="keys"></div></div>
+        <div class="billing-box"><div><h3>Planı yükselt</h3><p>Daha yüksek araştırma, watchlist ve API key kotası.</p></div><div><button data-plan="pro" class="upgrade ghost">Pro</button><button data-plan="team" class="upgrade ghost">Team</button></div></div>
+        <button id="logoutBtn" class="text-btn">Oturumu kapat</button>
+        <p id="dashError" class="error"></p>
+      </div>
+    </div>
+  </div>
+
+  <script src="/saas-assets/app.js" defer></script>
+</body>
+</html>
