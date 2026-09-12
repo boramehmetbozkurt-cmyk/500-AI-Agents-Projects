@@ -33,7 +33,10 @@ POLICIES: dict[str, SourcePolicy] = {
         "allowed_with_attribution",
         "Credit NASA FIRMS/LANCE and preserve source-specific notices.",
         "https://firms.modaps.eosdis.nasa.gov/",
-        "Basemap/third-party imagery can carry separate terms; fire detections and imagery are not interchangeable.",
+        (
+            "Basemap/third-party imagery can carry separate terms; fire detections "
+            "and imagery are not interchangeable."
+        ),
     ),
     "gdelt": SourcePolicy(
         "gdelt",
@@ -64,7 +67,10 @@ POLICIES: dict[str, SourcePolicy] = {
         "opensky",
         "license_required",
         "license_required",
-        "OpenSky attribution and a written commercial/operational license are required for product use.",
+        (
+            "OpenSky attribution and a written commercial/operational license are "
+            "required for product use."
+        ),
         "https://opensky-network.org/about/terms-of-use",
     ),
     "calculator": SourcePolicy(
@@ -84,21 +90,42 @@ POLICIES: dict[str, SourcePolicy] = {
         "model://router",
         "Direct reasoning is not treated as fresh factual evidence.",
     ),
+    "capability_gap": SourcePolicy(
+        "capability_gap",
+        "local",
+        "local_system",
+        "allowed",
+        "No external source attribution required.",
+        "local://capability-gap",
+        (
+            "Reports missing connector requirements and intentionally does not "
+            "fabricate external facts."
+        ),
+    ),
     "web_search": SourcePolicy(
         "web_search",
         "configured_web_search",
         "connector_terms",
         "review",
-        "Preserve source URLs and attribution returned by the configured web-search connector.",
+        (
+            "Preserve source URLs and attribution returned by the configured "
+            "web-search connector."
+        ),
         "connector://web_search",
-        "Commercial redistribution rights depend on the configured provider and underlying sources.",
+        (
+            "Commercial redistribution rights depend on the configured provider "
+            "and underlying sources."
+        ),
     ),
     "sports_research": SourcePolicy(
         "sports_research",
         "configured_sports",
         "connector_terms",
         "review",
-        "Preserve provider/source attribution returned by the configured sports connector.",
+        (
+            "Preserve provider/source attribution returned by the configured "
+            "sports connector."
+        ),
         "connector://sports_research",
         "Sports data and odds feeds commonly require separate commercial rights.",
     ),
@@ -109,9 +136,15 @@ DEFAULT_REVIEW_POLICY = SourcePolicy(
     "mixed_or_upstream",
     "mixed_review",
     "review",
-    "Preserve upstream attribution and verify provider terms before commercial redistribution.",
+    (
+        "Preserve upstream attribution and verify provider terms before commercial "
+        "redistribution."
+    ),
     "https://www.osirisai.live/docs",
-    "OSIRIS aggregates multiple upstream sources; the OSIRIS MIT license does not override upstream data licenses.",
+    (
+        "OSIRIS aggregates multiple upstream sources; the OSIRIS MIT license does "
+        "not override upstream data licenses."
+    ),
 )
 
 
@@ -138,14 +171,24 @@ def enforce_source_policy(tools: Iterable[str]) -> tuple[list[str], list[str]]:
         policy = policy_for_tool(tool)
         if not settings.commercial_mode:
             allowed.append(tool)
-            if policy.status in {"license_required", "mixed_review", "connector_terms"}:
+            if policy.status in {
+                "license_required",
+                "mixed_review",
+                "connector_terms",
+            }:
                 warnings.append(f"{tool}: {policy.status} — {policy.terms_url}")
             continue
 
-        provider_tokens = {part.strip() for part in policy.provider.split("_and_") if part.strip()}
+        provider_tokens = {
+            part.strip()
+            for part in policy.provider.split("_and_")
+            if part.strip()
+        }
         explicitly_licensed = bool(provider_tokens & licensed) or policy.provider in licensed
         if policy.commercial_use == "license_required" and not explicitly_licensed:
-            warnings.append(f"BLOCKED {tool}: commercial license required from {policy.provider}")
+            warnings.append(
+                f"BLOCKED {tool}: commercial license required from {policy.provider}"
+            )
             continue
         if (
             policy.commercial_use == "review"
@@ -153,11 +196,14 @@ def enforce_source_policy(tools: Iterable[str]) -> tuple[list[str], list[str]]:
             and not explicitly_licensed
         ):
             warnings.append(
-                f"BLOCKED {tool}: commercial source terms require review ({policy.provider})"
+                f"BLOCKED {tool}: commercial source terms require review "
+                f"({policy.provider})"
             )
             continue
         allowed.append(tool)
         if policy.commercial_use != "allowed":
-            warnings.append(f"{tool}: {policy.commercial_use} — {policy.attribution}")
+            warnings.append(
+                f"{tool}: {policy.commercial_use} — {policy.attribution}"
+            )
 
     return allowed, warnings
