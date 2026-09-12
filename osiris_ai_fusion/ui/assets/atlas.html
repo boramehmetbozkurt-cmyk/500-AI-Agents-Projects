@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="OSIRIS Fusion Atlas — AI Universe, AI Gene, AGI and Meta Universe maps">
+  <title>OSIRIS Fusion Atlas</title>
+  <link rel="stylesheet" href="/assets/atlas.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/">OSIRIS <b>FUSION</b></a>
+    <div class="top-actions">
+      <span id="snapshot" class="pill">snapshot —</span>
+      <a class="btn ghost" href="/app">Command Center</a>
+      <a class="btn ghost" href="/">SaaS</a>
+    </div>
+  </header>
+  <main class="shell">
+    <section class="intro">
+      <div>
+        <span class="eyebrow">FUSION ATLAS</span>
+        <h1>AI evrenini <span>kanıt zinciriyle</span> gez.</h1>
+        <p>Model aileleri, AGI yetenek alanları ve metaverse/XR omurgasını tek etkileşimli bilgi grafında incele. Her kaynaklı düğüm resmi dokümana bağlanır; canlı araştırma OSIRIS Fusion üzerinden evidence-first çalışır.</p>
+      </div>
+      <div class="stats" id="stats"></div>
+    </section>
+
+    <section class="controls card">
+      <div id="mapTabs" class="tabs"></div>
+      <div class="control-row">
+        <label class="search"><span>ARA</span><input id="search" placeholder="model, kurum, yetenek, standart..."></label>
+        <label><span>KÜME</span><select id="cluster"><option value="">Tümü</option></select></label>
+        <label><span>GÜVEN</span><select id="confidence"><option value="0">Tümü</option><option value="0.8">≥ 80%</option><option value="0.9">≥ 90%</option></select></label>
+        <button id="reset" class="btn">Sıfırla</button>
+      </div>
+      <p id="disclaimer" class="disclaimer"></p>
+    </section>
+
+    <section class="workspace">
+      <div class="graph-card card">
+        <div class="graph-head"><div><small>KNOWLEDGE GRAPH</small><h2 id="mapTitle">—</h2><p id="mapSubtitle">—</p></div><div id="legend" class="legend"></div></div>
+        <div class="canvas-wrap"><svg id="graph" viewBox="0 0 1200 720" role="img" aria-label="Knowledge graph"></svg></div>
+      </div>
+      <aside class="side">
+        <div class="card detail-card">
+          <small>SELECTED NODE</small>
+          <h2 id="nodeTitle">Bir düğüm seç</h2>
+          <div id="nodeMeta" class="meta"></div>
+          <p id="nodeDesc">Graf üzerinde bir düğüme dokunarak açıklama, güven skoru ve kaynakları gör.</p>
+          <div id="nodeTags" class="tags"></div>
+          <div id="nodeSources" class="sources"></div>
+          <button id="researchBtn" class="btn primary" disabled>Canlı araştır</button>
+        </div>
+        <div class="card research-card">
+          <div class="research-head"><small>LIVE EVIDENCE</small><span id="researchStatus" class="pill muted">idle</span></div>
+          <div id="researchOutput" class="research-output">Canlı araştırma seçili düğümü OSIRIS Fusion'ın pasif/read-only araştırma zincirinden geçirir.</div>
+        </div>
+      </aside>
+    </section>
+
+    <section class="card source-policy">
+      <div><small>SOURCE POLICY</small><h2>Harita iddia üretmez; iddia kaynağa bağlanır.</h2></div>
+      <p id="sourcePolicy"></p>
+    </section>
+  </main>
+  <script src="/assets/atlas.js" defer></script>
+</body>
+</html>
