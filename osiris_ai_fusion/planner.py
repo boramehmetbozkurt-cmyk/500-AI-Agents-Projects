@@ -6,7 +6,6 @@ from typing import Any
 
 from capabilities import (
     auto_tool_names,
-    capability_specs,
     infer_capability_names,
     likely_requires_external_data,
     resolve_capability_gap,
@@ -63,10 +62,29 @@ KEYWORD_TOOL_MAP = {
 }
 
 OSINT_BROAD_TERMS = {
-    "olağandışı", "anomali", "risk", "tehdit", "olay", "gelişme", "brief",
-    "intelligence", "osint", "ülke", "bölge", "region", "threat", "incident",
+    "olağandışı",
+    "anomali",
+    "risk",
+    "tehdit",
+    "olay",
+    "gelişme",
+    "brief",
+    "intelligence",
+    "osint",
+    "ülke",
+    "bölge",
+    "region",
+    "threat",
+    "incident",
 }
-DEFAULT_TOOL_SET = {"earthquakes", "fires", "weather", "gdelt", "news", "country_risk"}
+DEFAULT_TOOL_SET = {
+    "earthquakes",
+    "fires",
+    "weather",
+    "gdelt",
+    "news",
+    "country_risk",
+}
 
 
 def infer_question_type(query: str) -> str:
@@ -103,20 +121,27 @@ def infer_time_range(query: str) -> str | None:
     return None
 
 
-def deterministic_tools(query: str, requested_tools: list[str] | None = None) -> list[str]:
+def deterministic_tools(
+    query: str,
+    requested_tools: list[str] | None = None,
+) -> list[str]:
     settings = get_settings()
     q = query.lower()
     available = auto_tool_names()
 
     native = {tool for keyword, tool in KEYWORD_TOOL_MAP.items() if keyword in q}
-    capabilities = {name for name in infer_capability_names(query) if name in available}
+    inferred = infer_capability_names(query)
+    capabilities = {name for name in inferred if name in available}
     selected = native | capabilities
 
     if not selected and any(term in q for term in OSINT_BROAD_TERMS):
         selected = DEFAULT_TOOL_SET & available
 
-    if not selected and likely_requires_external_data(query) and "web_search" in available:
-        selected = {"web_search"}
+    if not selected and likely_requires_external_data(query):
+        if "web_search" in available:
+            selected = {"web_search"}
+        elif "capability_gap" in available:
+            selected = {"capability_gap"}
 
     if not selected:
         selected = {"direct_reasoning"} if "direct_reasoning" in available else set()
@@ -125,7 +150,10 @@ def deterministic_tools(query: str, requested_tools: list[str] | None = None) ->
         requested = {normalize_tool_name(tool) for tool in requested_tools}
         unknown = requested.difference(available)
         if unknown:
-            raise PermissionError(f"Unknown, unavailable, or non-read-only tools requested: {sorted(unknown)}")
+            raise PermissionError(
+                "Unknown, unavailable, or non-read-only tools requested: "
+                f"{sorted(unknown)}"
+            )
         selected &= requested
         if not selected and requested:
             selected = requested
@@ -148,18 +176,23 @@ async def build_plan(
 
     if settings.ai_planner_enabled and requested_tools is None:
         system = (
-            "You are OSIRIS Fusion's universal capability planner. Return only JSON matching the schema. "
-            "Select only from AVAILABLE_TOOLS. Use the smallest sufficient set. Use direct_reasoning for "
-            "drafting, rewriting, ideation and stable reasoning tasks. Use web_search for fresh public facts "
-            "when it is available. Use specialized connectors such as sports_research when relevant. Never "
-            "request active scanning, exploitation, credential access, facial tracking or intrusive surveillance."
+            "You are OSIRIS Fusion's universal capability planner. Return only JSON "
+            "matching the schema. Select only from AVAILABLE_TOOLS and use the "
+            "smallest sufficient set. Use direct_reasoning only for drafting, "
+            "rewriting, ideation and stable reasoning tasks. For fresh/current factual "
+            "tasks use a specialized connector or web_search. If fresh/current facts "
+            "are requested and no suitable external connector is available, select "
+            "capability_gap; never substitute direct_reasoning. Never request active "
+            "scanning, exploitation, credential access, facial tracking or intrusive "
+            "surveillance."
         )
         prompt = (
             f"QUERY: {query}\n"
             f"USER_SCOPE: {json.dumps(scope, ensure_ascii=False)}\n"
             f"AVAILABLE_TOOLS: {', '.join(sorted(available))}\n"
             f"MAX_TOOL_CALLS: {settings.max_tool_calls}\n"
-            "If a requested external capability is unavailable, do not invent a tool name."
+            "If a requested external capability is unavailable, select capability_gap "
+            "rather than inventing a tool or using direct_reasoning for fresh facts."
         )
         try:
             payload, model_result = await ModelRouter().generate_json(
@@ -171,11 +204,44 @@ async def build_plan(
             normalized = [normalize_tool_name(item) for item in candidate.tools]
             valid = [item for item in normalized if item in available]
             if valid:
+                if likely_requires_external_data(query):
+                    external = {
+                        "web_search",
+                        "sports_research",
+                        "earthquakes",
+                        "fires",
+                        "weather",
+                        "air_quality",
+                        "radar",
+                        "satellites",
+                        "space_weather",
+                        "conflicts",
+                        "frontlines",
+                        "gdelt",
+                        "country_risk",
+                        "region_dossier",
+                        "news",
+                        "live_news",
+                        "markets",
+                        "crypto",
+                        "scm_suppliers",
+                        "cctv",
+                        "infrastructure",
+                        "maritime",
+                        "cyber_threats",
+                        "cyber_attacks",
+                        "malware",
+                    }
+                    if not any(item in external for item in valid):
+                        valid = ["capability_gap"]
                 tools = valid[: settings.max_tool_calls]
                 region = candidate.region or region
                 time_range = candidate.time_range or time_range
                 question_type = candidate.question_type
-                model_meta = {"provider": model_result.provider, "model": model_result.model}
+                model_meta = {
+                    "provider": model_result.provider,
+                    "model": model_result.model,
+                }
         except Exception:
             pass
 
@@ -184,10 +250,13 @@ async def build_plan(
     if tools and not allowed:
         detail = "; ".join(warnings + gaps)
         raise PermissionError(
-            "No tools remain after source-license/commercial policy enforcement: " + detail
+            "No tools remain after source-license/commercial policy enforcement: "
+            + detail
         )
 
-    rationale = "Universal capability router selected the smallest authorized read-only tool set."
+    rationale = (
+        "Universal capability router selected the smallest authorized read-only tool set."
+    )
     if gaps:
         rationale += " Capability gaps: " + "; ".join(gaps)
 
