@@ -33,8 +33,7 @@ POLICIES: dict[str, SourcePolicy] = {
         "allowed_with_attribution",
         "Credit NASA FIRMS/LANCE and preserve source-specific notices.",
         "https://firms.modaps.eosdis.nasa.gov/",
-        "Basemap/third-party imagery can carry separate terms; fire detections and "
-        "imagery are not interchangeable.",
+        "Basemap/third-party imagery can carry separate terms; fire detections and imagery are not interchangeable.",
     ),
     "gdelt": SourcePolicy(
         "gdelt",
@@ -65,9 +64,43 @@ POLICIES: dict[str, SourcePolicy] = {
         "opensky",
         "license_required",
         "license_required",
-        "OpenSky attribution and a written commercial/operational license are required "
-        "for product use.",
+        "OpenSky attribution and a written commercial/operational license are required for product use.",
         "https://opensky-network.org/about/terms-of-use",
+    ),
+    "calculator": SourcePolicy(
+        "calculator",
+        "local",
+        "local_computation",
+        "allowed",
+        "No external source attribution required.",
+        "local://calculator",
+    ),
+    "direct_reasoning": SourcePolicy(
+        "direct_reasoning",
+        "model_router",
+        "model_output",
+        "allowed",
+        "Model-provider terms apply to the configured model endpoint.",
+        "model://router",
+        "Direct reasoning is not treated as fresh factual evidence.",
+    ),
+    "web_search": SourcePolicy(
+        "web_search",
+        "configured_web_search",
+        "connector_terms",
+        "review",
+        "Preserve source URLs and attribution returned by the configured web-search connector.",
+        "connector://web_search",
+        "Commercial redistribution rights depend on the configured provider and underlying sources.",
+    ),
+    "sports_research": SourcePolicy(
+        "sports_research",
+        "configured_sports",
+        "connector_terms",
+        "review",
+        "Preserve provider/source attribution returned by the configured sports connector.",
+        "connector://sports_research",
+        "Sports data and odds feeds commonly require separate commercial rights.",
     ),
 }
 
@@ -78,8 +111,7 @@ DEFAULT_REVIEW_POLICY = SourcePolicy(
     "review",
     "Preserve upstream attribution and verify provider terms before commercial redistribution.",
     "https://www.osirisai.live/docs",
-    "OSIRIS aggregates multiple upstream sources; the OSIRIS MIT license does not "
-    "override upstream data licenses.",
+    "OSIRIS aggregates multiple upstream sources; the OSIRIS MIT license does not override upstream data licenses.",
 )
 
 
@@ -106,7 +138,7 @@ def enforce_source_policy(tools: Iterable[str]) -> tuple[list[str], list[str]]:
         policy = policy_for_tool(tool)
         if not settings.commercial_mode:
             allowed.append(tool)
-            if policy.status in {"license_required", "mixed_review"}:
+            if policy.status in {"license_required", "mixed_review", "connector_terms"}:
                 warnings.append(f"{tool}: {policy.status} — {policy.terms_url}")
             continue
 
