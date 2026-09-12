@@ -1,43 +1,74 @@
-# OSIRIS FUSION 1.1 — Universal Capabilities
+# OSIRIS FUSION 1.2 — Provider Federation
 
-OSIRIS FUSION does not try to hard-code every possible user question. It uses a capability router that chooses the smallest authorized read-only capability for each request.
+OSIRIS FUSION does not hard-code one connector per question type. External research is routed through a domain-agnostic `provider_federation` capability that can rank and query multiple trusted read-only providers in parallel.
 
-## Routing order
+Sports is only one provider domain. It is not the center of the architecture and it is not a privileged autonomous tool.
 
-1. Native OSIRIS passive feeds for supported OSINT domains.
-2. A specialized configured connector, such as `sports_research`.
-3. A general configured `web_search` connector for fresh public facts.
-4. Local deterministic tools such as `calculator`.
-5. `direct_reasoning` for non-fresh drafting, transformation, ideation and stable reasoning.
-6. `capability_gap` when fresh/current facts require a connector that is not configured.
-
-The last rule is deliberate. A missing live-data connector must never be silently replaced by model memory or a fabricated answer.
-
-## Built-in extension points
-
-### General web research
-
-Configure once:
+## Routing model
 
 ```text
-FUSION_WEB_SEARCH_URL=https://your-trusted-search-connector.example/query
-FUSION_WEB_SEARCH_API_KEY=...
+user query
+  -> planner
+  -> native OSIRIS passive feeds, when applicable
+  -> provider_federation for external research
+       -> rank matching providers
+       -> fan out to up to FUSION_PROVIDER_FANOUT providers
+       -> collect JSON evidence in parallel
+       -> use general web only when no better provider is ready
+  -> calculator for deterministic arithmetic
+  -> direct_reasoning for non-fresh drafting / transformation / ideation
+  -> capability_gap when required live data has no trusted provider
+  -> evidence + analysis + SEAL effect verification + receipt
 ```
 
-### Sports research
+The fail-closed rule is deliberate. Missing live-data access must not be silently replaced by model memory or a fabricated answer.
 
-Configure once:
+## Provider domains
 
-```text
-FUSION_SPORTS_URL=https://your-trusted-sports-connector.example/query
-FUSION_SPORTS_API_KEY=...
-```
+Configured provider profiles exist for:
 
-The planner then discovers and selects these capabilities automatically when the query requires them.
+- sports
+- finance and market data
+- crypto and blockchain
+- news and current events
+- science and academic research
+- patents and intellectual property
+- companies and business intelligence
+- legal and regulation research
+- real estate and property
+- vehicles and automotive listings/data
+- jobs and careers
+- travel
+- shopping and product research
+- public social/forum research
+- places, maps and local search
+- general web research as a fallback
 
-## Connector contract
+Any subset can be configured. The router discovers which providers are actually ready at runtime.
 
-Read-only HTTP connectors receive a POST request:
+## Built-in live read-only providers
+
+Fusion includes direct adapters for several public JSON APIs that do not require secrets:
+
+- Turkish Wikipedia search
+- OpenAlex scholarly works
+- Crossref scholarly metadata
+- OpenStreetMap Nominatim place search
+- Hacker News search via Algolia
+
+These providers are still subject to their own terms, attribution rules and rate limits. Being technically reachable does not grant redistribution or commercial rights.
+
+## Multi-provider fan-out
+
+`FUSION_PROVIDER_FANOUT` controls how many ranked providers a single external-research query may use in parallel. The default is 3 and the runtime clamps the value to a bounded range.
+
+For example, an academic query can route to both OpenAlex and Crossref. A configured finance deployment can route to more than one finance provider. The result records the providers used and their source URLs so evidence remains traceable.
+
+General web is not the single gateway for the whole product. It is the fallback when no more specific ready provider matches the query.
+
+## Configured provider gateway contract
+
+Administrator-configured provider gateways receive a read-only POST request:
 
 ```json
 {
@@ -50,40 +81,71 @@ Read-only HTTP connectors receive a POST request:
 }
 ```
 
-They must return a JSON object or array. When applicable, the response should preserve source URLs, timestamps and provider attribution so Fusion can bind the result into its evidence ledger.
+They must return JSON. Responses should preserve original source URLs, timestamps, identifiers and attribution wherever applicable.
 
-Connector endpoints are administrator-configured. User prompts cannot supply arbitrary connector URLs. Production endpoints must use HTTPS; plain HTTP is accepted only for localhost development. Redirects are not followed and response size is bounded.
+Example environment variables:
 
-## Add a new domain without changing Python code
+```text
+FUSION_FINANCE_URL=https://your-finance-gateway.example/query
+FUSION_FINANCE_API_KEY=...
+FUSION_SPORTS_URL=https://your-sports-gateway.example/query
+FUSION_SPORTS_API_KEY=...
+FUSION_WEB_SEARCH_URL=https://your-general-search-gateway.example/query
+FUSION_WEB_SEARCH_API_KEY=...
+```
 
-Set `FUSION_CAPABILITY_DIR` to a trusted local directory containing JSON manifests. Example:
+Provider URLs are administrator configuration, not prompt input. Production endpoints must use HTTPS; localhost development can use HTTP. Redirects are not followed and response size is bounded.
+
+## Add providers without planner changes
+
+Set `FUSION_PROVIDER_DIR` to a trusted local directory containing JSON provider manifests. A file can contain one provider, a list, or a `providers` array.
+
+Example with two finance providers:
 
 ```json
 {
-  "name": "patents_research",
-  "domain": "patents",
-  "description": "Read-only patent and filing research connector.",
-  "kind": "http_json",
-  "read_only": true,
-  "auto_execute": true,
-  "url_env": "FUSION_PATENTS_URL",
-  "api_key_env": "FUSION_PATENTS_API_KEY",
-  "keywords": ["patent", "patentler", "filing"],
-  "provider": "your_patent_provider"
+  "providers": [
+    {
+      "provider_id": "finance_primary",
+      "domains": ["finance", "markets"],
+      "description": "Primary read-only market provider",
+      "transport": "get_json",
+      "url": "https://provider-a.example/search",
+      "query_param": "q",
+      "keywords": ["hisse", "stock", "ticker", "price"],
+      "priority": 99,
+      "read_only": true,
+      "auto_execute": true
+    },
+    {
+      "provider_id": "finance_secondary",
+      "domains": ["finance", "markets"],
+      "description": "Secondary read-only market provider",
+      "transport": "get_json",
+      "url": "https://provider-b.example/search",
+      "query_param": "q",
+      "keywords": ["hisse", "stock", "ticker", "price"],
+      "priority": 95,
+      "read_only": true,
+      "auto_execute": true
+    }
+  ]
 }
 ```
 
-Then configure the endpoint as an environment variable. The manifest directory must be controlled by the deployment administrator; manifests are not accepted from end-user prompts.
+The manifest directory must be controlled by the deployment administrator. Manifests and execution URLs are never accepted from end-user prompts.
 
-## Capability discovery API
+## Discovery API
 
-`GET /capabilities` reports all native and extension capabilities, their readiness and missing configuration.
+`GET /providers` reports provider domains, readiness, configuration gaps, priority, attribution metadata and commercial-policy context.
 
-`GET /capabilities/resolve?query=...` previews which capabilities the router would select and reports missing connectors before execution.
+`GET /capabilities` reports autonomous capabilities. External providers are intentionally hidden behind one `provider_federation` tool contract instead of creating a new planner tool for every data source.
+
+`GET /capabilities/resolve?query=...` previews the selected capabilities, matching provider domains, provider route and capability gaps before execution.
 
 ## SEAL boundary
 
-Every automatically executed capability is still subject to the same SEAL flow:
+Every automatically executed path stays inside the same authorization boundary:
 
 ```text
 query
@@ -96,14 +158,14 @@ query
   -> receipt
 ```
 
-Adding a connector does not bypass authorization. Only capabilities marked both `read_only=true` and `auto_execute=true` are eligible for autonomous execution.
+Adding a provider does not bypass authorization. Provider federation remains passive/read-only. Active scanning, exploitation, credential access, intrusive surveillance and facial tracking are outside the autonomous tool boundary.
 
-## Actions are different
+## Action connectors are separate
 
-A future connector that can send mail, change records, make purchases, publish content or perform another side effect must not be registered as an autonomous read-only capability. Action connectors require a separate approval flow, explicit user authorization and a stricter SEAL effect policy.
+A future connector that can send mail, edit records, make a purchase, publish content or cause another side effect must not be registered as an autonomous read-only provider. Actions require explicit user approval and a stricter SEAL effect policy.
 
 ## What “universal” means
 
-Universal capability routing means a new read-only knowledge domain can normally be connected once and then discovered automatically, rather than requiring a new planner implementation for every question.
+Universal means new legitimate read-only knowledge sources can normally be connected once, described in the provider registry, and then discovered automatically. One query may use several providers rather than forcing all traffic through one service.
 
-It does not mean the system has magical access to every private database or live service. A provider that requires an account, API key, license or private connector still has to be connected legitimately. Until then, Fusion reports the exact capability gap instead of inventing data.
+It does not mean Fusion has magical access to every private database or paid service. Services that require an account, API key, paid license or private connector still need legitimate access. When that access is absent, Fusion reports the provider gap instead of inventing data.

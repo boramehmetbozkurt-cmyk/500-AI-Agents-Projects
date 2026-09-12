@@ -26,6 +26,7 @@ from llm import ModelRouter
 from metrics import metrics
 from osiris_client import FORBIDDEN_ACTIVE_PATHS, READ_ONLY_TOOLS, OsirisClient, tool_catalog
 from planner import deterministic_tools
+from providers import provider_catalog, provider_domains_for_query, route_providers
 from rate_limit import InMemoryRateLimiter
 from schemas import CaseCreate, InvestigationRequestModel, WatchlistCreate
 from seal import verify_receipt
@@ -56,10 +57,10 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(
     title="OSIRIS Fusion",
-    version="1.1.0",
+    version="1.2.0",
     description=(
         "Evidence-first, authorization-aware AI intelligence operating system with "
-        "discoverable read-only capabilities and connector fallbacks."
+        "domain-agnostic multi-provider read-only federation."
     ),
     lifespan=lifespan,
 )
@@ -138,10 +139,12 @@ async def health() -> dict[str, Any]:
 
 @app.get("/ready")
 async def ready(_: str = Depends(require_api_key)) -> dict[str, Any]:
+    providers = provider_catalog()
     result: dict[str, Any] = {
         "status": "ready",
         "dependencies": {},
         "capabilities_ready": sorted(auto_tool_names()),
+        "providers_ready": [row["provider_id"] for row in providers if row.get("ready")],
     }
     try:
         async with OsirisClient() as client:
@@ -189,13 +192,14 @@ async def tools(_: str = Depends(require_api_key)) -> dict[str, Any]:
 async def capabilities(_: str = Depends(require_api_key)) -> dict[str, Any]:
     rows = capability_catalog()
     return {
-        "version": "1.1",
-        "mode": "discoverable-read-only",
+        "version": "1.2",
+        "mode": "provider-federated-read-only",
         "ready": [row["name"] for row in rows if row.get("ready")],
         "capabilities": rows,
         "rule": (
             "Only ready, read-only, auto_execute capabilities can run autonomously. "
-            "Action connectors must remain approval-gated."
+            "External provider selection occurs inside provider_federation; action "
+            "connectors remain approval-gated."
         ),
     }
 
@@ -207,10 +211,13 @@ async def resolve_capabilities(
 ) -> dict[str, Any]:
     inferred = infer_capability_names(query)
     selected = deterministic_tools(query)
+    routed = route_providers(query)
     return {
         "query": query,
         "selected": selected,
-        "specialized_inference": inferred,
+        "local_capability_inference": inferred,
+        "provider_domains": provider_domains_for_query(query),
+        "provider_route": [provider.provider_id for provider in routed],
         "external_data_likely_required": likely_requires_external_data(query),
         "capability_gaps": resolve_capability_gap(query, inferred),
         "ready_capabilities": sorted(auto_tool_names()),
@@ -219,12 +226,20 @@ async def resolve_capabilities(
 
 @app.get("/providers")
 async def providers(_: str = Depends(require_api_key)) -> dict[str, Any]:
+    rows = provider_catalog()
     all_tools = sorted(auto_tool_names() | set(READ_ONLY_TOOLS))
     return {
+        "federation_mode": "multi-provider-read-only",
+        "ready_providers": [row["provider_id"] for row in rows if row.get("ready")],
+        "providers": rows,
         "commercial_mode": settings.commercial_mode,
         "strict_commercial_sources": settings.strict_commercial_sources,
         "licensed_providers": sorted(settings.licensed_providers),
-        "policies": policy_report(all_tools),
+        "tool_policies": policy_report(all_tools),
+        "rule": (
+            "Provider URLs come only from trusted built-ins, environment configuration "
+            "or administrator manifests; user prompts cannot supply execution URLs."
+        ),
     }
 
 

@@ -73,6 +73,22 @@ POLICIES: dict[str, SourcePolicy] = {
         ),
         "https://opensky-network.org/about/terms-of-use",
     ),
+    "provider_federation": SourcePolicy(
+        "provider_federation",
+        "provider_registry",
+        "connector_terms",
+        "review",
+        (
+            "Preserve each selected provider's source URLs, identifiers and attribution; "
+            "provider-specific terms remain in force."
+        ),
+        "connector://provider-federation",
+        (
+            "The federation is only a router and does not grant redistribution rights. "
+            "In strict commercial mode, explicitly license/approve provider_registry "
+            "and verify each underlying provider shown by /providers."
+        ),
+    ),
     "calculator": SourcePolicy(
         "calculator",
         "local",
@@ -105,29 +121,18 @@ POLICIES: dict[str, SourcePolicy] = {
     "web_search": SourcePolicy(
         "web_search",
         "configured_web_search",
-        "connector_terms",
+        "legacy_connector_terms",
         "review",
-        (
-            "Preserve source URLs and attribution returned by the configured "
-            "web-search connector."
-        ),
+        "Legacy compatibility entry; use provider_federation for autonomous research.",
         "connector://web_search",
-        (
-            "Commercial redistribution rights depend on the configured provider "
-            "and underlying sources."
-        ),
     ),
     "sports_research": SourcePolicy(
         "sports_research",
         "configured_sports",
-        "connector_terms",
+        "legacy_connector_terms",
         "review",
-        (
-            "Preserve provider/source attribution returned by the configured "
-            "sports connector."
-        ),
+        "Legacy compatibility entry; sports is a provider profile in the federation.",
         "connector://sports_research",
-        "Sports data and odds feeds commonly require separate commercial rights.",
     ),
 }
 
@@ -175,6 +180,7 @@ def enforce_source_policy(tools: Iterable[str]) -> tuple[list[str], list[str]]:
                 "license_required",
                 "mixed_review",
                 "connector_terms",
+                "legacy_connector_terms",
             }:
                 warnings.append(f"{tool}: {policy.status} — {policy.terms_url}")
             continue

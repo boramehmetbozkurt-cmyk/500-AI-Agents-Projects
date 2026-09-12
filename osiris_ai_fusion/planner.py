@@ -12,7 +12,8 @@ from capabilities import (
 )
 from config import get_settings
 from llm import ModelRouter
-from osiris_client import normalize_tool_name
+from osiris_client import READ_ONLY_TOOLS, normalize_tool_name
+from providers import route_providers
 from schemas import InvestigationPlan
 from source_policy import enforce_source_policy
 
@@ -129,19 +130,28 @@ def deterministic_tools(
     q = query.lower()
     available = auto_tool_names()
 
-    native = {tool for keyword, tool in KEYWORD_TOOL_MAP.items() if keyword in q}
+    native = {
+        tool
+        for keyword, tool in KEYWORD_TOOL_MAP.items()
+        if keyword in q and tool in available
+    }
     inferred = infer_capability_names(query)
     capabilities = {name for name in inferred if name in available}
     selected = native | capabilities
 
+    providers = route_providers(query)
+    if providers and "provider_federation" in available:
+        selected.add("provider_federation")
+
     if not selected and any(term in q for term in OSINT_BROAD_TERMS):
         selected = DEFAULT_TOOL_SET & available
 
-    if not selected and likely_requires_external_data(query):
-        if "web_search" in available:
-            selected = {"web_search"}
-        elif "capability_gap" in available:
-            selected = {"capability_gap"}
+    if (
+        not selected
+        and likely_requires_external_data(query)
+        and "provider_federation" in available
+    ):
+        selected = {"provider_federation"}
 
     if not selected:
         selected = {"direct_reasoning"} if "direct_reasoning" in available else set()
@@ -172,27 +182,31 @@ async def build_plan(
     region = scope.get("region")
     time_range = scope.get("time_range") or infer_time_range(query)
     question_type = infer_question_type(query)
-    model_meta = {"provider": "deterministic", "model": "capability-router-v1"}
+    model_meta = {"provider": "deterministic", "model": "provider-federation-router-v2"}
+    deterministic_external = "provider_federation" in tools
 
     if settings.ai_planner_enabled and requested_tools is None:
         system = (
-            "You are OSIRIS Fusion's universal capability planner. Return only JSON "
-            "matching the schema. Select only from AVAILABLE_TOOLS and use the "
-            "smallest sufficient set. Use direct_reasoning only for drafting, "
-            "rewriting, ideation and stable reasoning tasks. For fresh/current factual "
-            "tasks use a specialized connector or web_search. If fresh/current facts "
-            "are requested and no suitable external connector is available, select "
-            "capability_gap; never substitute direct_reasoning. Never request active "
-            "scanning, exploitation, credential access, facial tracking or intrusive "
-            "surveillance."
+            "You are OSIRIS Fusion's provider-federated capability planner. Return only "
+            "JSON matching the schema. Select only from AVAILABLE_TOOLS and use the "
+            "smallest sufficient set. provider_federation is the single domain-agnostic "
+            "external research capability: it ranks and fans out across multiple trusted "
+            "read-only providers, with general web used only as a fallback. Do not invent "
+            "provider-specific tool names. Use direct_reasoning only for drafting, "
+            "rewriting, ideation and stable reasoning tasks. For external factual research "
+            "select provider_federation when native OSIRIS feeds are insufficient. Never "
+            "substitute direct_reasoning for fresh facts. Never request active scanning, "
+            "exploitation, credential access, facial tracking or intrusive surveillance."
         )
         prompt = (
             f"QUERY: {query}\n"
             f"USER_SCOPE: {json.dumps(scope, ensure_ascii=False)}\n"
             f"AVAILABLE_TOOLS: {', '.join(sorted(available))}\n"
             f"MAX_TOOL_CALLS: {settings.max_tool_calls}\n"
-            "If a requested external capability is unavailable, select capability_gap "
-            "rather than inventing a tool or using direct_reasoning for fresh facts."
+            "External providers are hidden behind provider_federation. Sports, finance, "
+            "crypto, science, patents, companies, legal, real estate, vehicles, jobs, "
+            "travel, shopping, social, places and general web are provider domains, not "
+            "separate autonomous tool contracts."
         )
         try:
             payload, model_result = await ModelRouter().generate_json(
@@ -204,36 +218,11 @@ async def build_plan(
             normalized = [normalize_tool_name(item) for item in candidate.tools]
             valid = [item for item in normalized if item in available]
             if valid:
-                if likely_requires_external_data(query):
-                    external = {
-                        "web_search",
-                        "sports_research",
-                        "earthquakes",
-                        "fires",
-                        "weather",
-                        "air_quality",
-                        "radar",
-                        "satellites",
-                        "space_weather",
-                        "conflicts",
-                        "frontlines",
-                        "gdelt",
-                        "country_risk",
-                        "region_dossier",
-                        "news",
-                        "live_news",
-                        "markets",
-                        "crypto",
-                        "scm_suppliers",
-                        "cctv",
-                        "infrastructure",
-                        "maritime",
-                        "cyber_threats",
-                        "cyber_attacks",
-                        "malware",
-                    }
-                    if not any(item in external for item in valid):
-                        valid = ["capability_gap"]
+                external_tools = set(READ_ONLY_TOOLS) | {"provider_federation"}
+                if deterministic_external and not any(
+                    item in external_tools for item in valid
+                ):
+                    valid = ["provider_federation"]
                 tools = valid[: settings.max_tool_calls]
                 region = candidate.region or region
                 time_range = candidate.time_range or time_range
@@ -255,10 +244,11 @@ async def build_plan(
         )
 
     rationale = (
-        "Universal capability router selected the smallest authorized read-only tool set."
+        "Provider-federated capability router selected the smallest authorized "
+        "read-only tool set; external research can fan out across ranked providers."
     )
     if gaps:
-        rationale += " Capability gaps: " + "; ".join(gaps)
+        rationale += " Provider gaps: " + "; ".join(gaps)
 
     plan = InvestigationPlan(
         question_type=question_type,
