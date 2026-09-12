@@ -1,9 +1,11 @@
+import json
 from pathlib import Path
 
 from capabilities import capability_catalog
 from config import get_settings
 from correlation import correlate_evidence
 from planner import deterministic_tools
+from providers import provider_catalog, route_providers
 from source_policy import enforce_source_policy
 from store import FusionStore
 
@@ -30,6 +32,17 @@ def test_commercial_policy_allows_licensed_opensky(monkeypatch):
     _reset_settings()
     allowed, _ = enforce_source_policy(["flights"])
     assert allowed == ["flights"]
+    _reset_settings()
+
+
+def test_commercial_policy_fails_closed_for_unapproved_federation(monkeypatch):
+    monkeypatch.setenv("COMMERCIAL_MODE", "true")
+    monkeypatch.setenv("STRICT_COMMERCIAL_SOURCES", "true")
+    monkeypatch.delenv("LICENSED_PROVIDERS", raising=False)
+    _reset_settings()
+    allowed, warnings = enforce_source_policy(["provider_federation"])
+    assert allowed == []
+    assert any("provider_registry" in warning for warning in warnings)
     _reset_settings()
 
 
@@ -113,39 +126,100 @@ def test_production_ui_files_exist_and_stream_real_backend():
     assert css.exists()
 
 
-def test_sports_query_fails_closed_without_connector(monkeypatch):
+def test_sports_is_provider_domain_not_special_autonomous_tool(monkeypatch):
     monkeypatch.delenv("FUSION_SPORTS_URL", raising=False)
     monkeypatch.delenv("FUSION_WEB_SEARCH_URL", raising=False)
     _reset_settings()
     tools = deterministic_tools("Bugünkü Dortmund maç skorunu tahmin et")
-    assert tools == ["capability_gap"]
+    assert tools == ["provider_federation"]
+    assert "sports_research" not in tools
     assert "direct_reasoning" not in tools
     _reset_settings()
 
 
-def test_sports_query_uses_configured_specialized_connector(monkeypatch):
+def test_configured_sports_provider_still_uses_federation(monkeypatch):
     monkeypatch.setenv("FUSION_SPORTS_URL", "https://example.invalid/sports")
     monkeypatch.delenv("FUSION_WEB_SEARCH_URL", raising=False)
     _reset_settings()
     tools = deterministic_tools("Bugünkü Dortmund maç skorunu tahmin et")
-    assert "sports_research" in tools
-    assert "capability_gap" not in tools
+    routed = [provider.provider_id for provider in route_providers("Bugünkü Dortmund maçı")]
+    assert tools == ["provider_federation"]
+    assert "sports" in routed
+    assert "sports_research" not in tools
     _reset_settings()
 
 
-def test_generic_fresh_query_uses_web_connector(monkeypatch):
+def test_science_query_routes_to_multiple_live_providers(monkeypatch):
+    monkeypatch.delenv("FUSION_SCIENCE_URL", raising=False)
+    monkeypatch.delenv("FUSION_WEB_SEARCH_URL", raising=False)
+    monkeypatch.setenv("FUSION_PROVIDER_FANOUT", "3")
+    routed = [
+        provider.provider_id
+        for provider in route_providers("machine learning research paper")
+    ]
+    assert "openalex" in routed
+    assert "crossref" in routed
+    assert deterministic_tools("machine learning research paper") == [
+        "provider_federation"
+    ]
+
+
+def test_provider_manifest_can_add_multiple_providers(monkeypatch, tmp_path):
+    manifest = [
+        {
+            "provider_id": "finance_alpha",
+            "domains": ["finance"],
+            "description": "Alpha finance",
+            "transport": "get_json",
+            "url": "https://example.invalid/alpha",
+            "query_param": "q",
+            "keywords": ["hisse"],
+            "priority": 99,
+        },
+        {
+            "provider_id": "finance_beta",
+            "domains": ["finance"],
+            "description": "Beta finance",
+            "transport": "get_json",
+            "url": "https://example.invalid/beta",
+            "query_param": "q",
+            "keywords": ["hisse"],
+            "priority": 98,
+        },
+    ]
+    (tmp_path / "finance.json").write_text(json.dumps(manifest), encoding="utf-8")
+    monkeypatch.setenv("FUSION_PROVIDER_DIR", str(tmp_path))
+    monkeypatch.setenv("FUSION_PROVIDER_FANOUT", "3")
+    routed = [provider.provider_id for provider in route_providers("Tesla hisse araştır")]
+    assert "finance_alpha" in routed
+    assert "finance_beta" in routed
+
+
+def test_general_web_is_fallback_not_central_router(monkeypatch):
     monkeypatch.setenv("FUSION_WEB_SEARCH_URL", "https://example.invalid/search")
-    monkeypatch.delenv("FUSION_SPORTS_URL", raising=False)
+    monkeypatch.delenv("FUSION_NEWS_URL", raising=False)
+    routed = [
+        provider.provider_id
+        for provider in route_providers("Bugün tamamen yeni bir olay hakkında ne oldu?")
+    ]
+    assert routed == ["general_web"]
+    assert deterministic_tools("Bugün tamamen yeni bir olay hakkında ne oldu?") == [
+        "provider_federation"
+    ]
+
+
+def test_generic_fresh_finance_query_uses_federation(monkeypatch):
+    monkeypatch.setenv("FUSION_WEB_SEARCH_URL", "https://example.invalid/search")
+    monkeypatch.delenv("FUSION_FINANCE_URL", raising=False)
     _reset_settings()
     tools = deterministic_tools("Apple'ın bugünkü fiyatı nedir?")
-    assert "web_search" in tools
+    assert tools == ["provider_federation"]
     assert "direct_reasoning" not in tools
     _reset_settings()
 
 
 def test_non_fresh_writing_uses_direct_reasoning(monkeypatch):
     monkeypatch.delenv("FUSION_WEB_SEARCH_URL", raising=False)
-    monkeypatch.delenv("FUSION_SPORTS_URL", raising=False)
     _reset_settings()
     assert deterministic_tools("Bana kısa bir slogan yaz") == ["direct_reasoning"]
     _reset_settings()
@@ -153,21 +227,27 @@ def test_non_fresh_writing_uses_direct_reasoning(monkeypatch):
 
 def test_calculation_uses_calculator(monkeypatch):
     monkeypatch.delenv("FUSION_WEB_SEARCH_URL", raising=False)
-    monkeypatch.delenv("FUSION_SPORTS_URL", raising=False)
     _reset_settings()
     assert deterministic_tools("hesapla 12 * (3 + 2)") == ["calculator"]
     _reset_settings()
 
 
-def test_capability_catalog_reports_connector_readiness(monkeypatch):
+def test_capability_catalog_exposes_federation_as_ready(monkeypatch):
     monkeypatch.delenv("FUSION_SPORTS_URL", raising=False)
     _reset_settings()
     rows = {row["name"]: row for row in capability_catalog()}
-    assert rows["sports_research"]["ready"] is False
-    assert "FUSION_SPORTS_URL" in rows["sports_research"]["missing_configuration"]
+    assert rows["provider_federation"]["ready"] is True
+    assert rows["provider_federation"]["auto_execute"] is True
+    assert rows["sports_research"]["auto_execute"] is False
+    _reset_settings()
 
-    monkeypatch.setenv("FUSION_SPORTS_URL", "https://example.invalid/sports")
-    _reset_settings()
-    rows = {row["name"]: row for row in capability_catalog()}
-    assert rows["sports_research"]["ready"] is True
-    _reset_settings()
+
+def test_provider_catalog_has_multiple_real_live_domains(monkeypatch):
+    monkeypatch.delenv("FUSION_FINANCE_URL", raising=False)
+    rows = {row["provider_id"]: row for row in provider_catalog()}
+    assert rows["openalex"]["ready"] is True
+    assert rows["crossref"]["ready"] is True
+    assert rows["wikipedia_tr"]["ready"] is True
+    assert rows["osm_nominatim"]["ready"] is True
+    assert rows["hn_algolia"]["ready"] is True
+    assert rows["finance"]["ready"] is False
