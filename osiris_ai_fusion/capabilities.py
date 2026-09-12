@@ -16,6 +16,11 @@ from config import get_settings
 from llm import ModelRouter
 from osiris_client import READ_ONLY_TOOLS, OsirisClient
 from provenance import make_evidence_record
+from providers import (
+    fetch_federated,
+    provider_domains_for_query,
+    provider_gap_messages,
+)
 
 
 @dataclass(frozen=True)
@@ -33,51 +38,42 @@ class CapabilitySpec:
 
 
 BUILTIN_CAPABILITIES: dict[str, CapabilitySpec] = {
+    "provider_federation": CapabilitySpec(
+        name="provider_federation",
+        domain="external_research",
+        description=(
+            "Domain-agnostic read-only provider federation. It can fan out one query "
+            "to multiple ranked providers and uses general web only as a fallback."
+        ),
+        kind="provider_federation",
+        provider="provider_registry",
+    ),
     "web_search": CapabilitySpec(
         name="web_search",
-        domain="general_research",
+        domain="legacy",
         description=(
-            "General public-web research connector for factual topics not covered "
-            "by OSIRIS-native feeds."
+            "Legacy compatibility connector. New autonomous routing uses "
+            "provider_federation and treats general web as one fallback provider."
         ),
         kind="http_json",
+        read_only=True,
+        auto_execute=False,
         url_env="FUSION_WEB_SEARCH_URL",
         api_key_env="FUSION_WEB_SEARCH_API_KEY",
-        keywords=(
-            "latest",
-            "today",
-            "bugün",
-            "current",
-            "güncel",
-            "who is",
-            "kimdir",
-            "price",
-            "fiyat",
-        ),
         provider="configured_web_search",
     ),
     "sports_research": CapabilitySpec(
         name="sports_research",
-        domain="sports",
+        domain="legacy",
         description=(
-            "Read-only sports fixtures, form, injuries/news, metrics and "
-            "prediction evidence connector."
+            "Legacy compatibility connector. Sports is now only one provider profile "
+            "inside the multi-domain provider federation."
         ),
         kind="http_json",
+        read_only=True,
+        auto_execute=False,
         url_env="FUSION_SPORTS_URL",
         api_key_env="FUSION_SPORTS_API_KEY",
-        keywords=(
-            "maç",
-            "skor",
-            "futbol",
-            "basketbol",
-            "fixture",
-            "match",
-            "score",
-            "odds",
-            "xg",
-            "form",
-        ),
         provider="configured_sports",
     ),
     "calculator": CapabilitySpec(
@@ -113,8 +109,8 @@ BUILTIN_CAPABILITIES: dict[str, CapabilitySpec] = {
         name="capability_gap",
         domain="system",
         description=(
-            "Fail-closed local capability that reports which fresh-data connector "
-            "is required instead of fabricating an answer."
+            "Fail-closed local capability that reports missing provider/connector "
+            "requirements instead of fabricating an answer."
         ),
         kind="local_gap",
         provider="local",
@@ -140,6 +136,37 @@ CURRENTNESS_TERMS = {
     "hava",
     "weather",
     "near me",
+}
+
+EXTERNAL_RESEARCH_TERMS = {
+    "maç",
+    "fixture",
+    "injury",
+    "sakat",
+    "puan durumu",
+    "standings",
+    "patent",
+    "research",
+    "araştırma",
+    "paper",
+    "makale",
+    "doi",
+    "şirket",
+    "company",
+    "iş ilanı",
+    "job",
+    "gayrimenkul",
+    "real estate",
+    "araba",
+    "vehicle",
+    "travel",
+    "seyahat",
+    "product",
+    "ürün",
+    "adres",
+    "address",
+    "location",
+    "konum",
 }
 
 
@@ -182,7 +209,12 @@ def capability_specs() -> dict[str, CapabilitySpec]:
 
 
 def capability_ready(spec: CapabilitySpec) -> bool:
-    if spec.kind in {"local_calculator", "local_model", "local_gap"}:
+    if spec.kind in {
+        "local_calculator",
+        "local_model",
+        "local_gap",
+        "provider_federation",
+    }:
         return True
     if spec.kind == "http_json":
         return bool(spec.url_env and os.getenv(spec.url_env, "").strip())
@@ -228,24 +260,14 @@ def likely_requires_external_data(query: str) -> bool:
     q = query.lower()
     if any(term in q for term in CURRENTNESS_TERMS):
         return True
-    return any(
-        term in q
-        for term in (
-            "maç",
-            "fixture",
-            "injury",
-            "sakat",
-            "puan durumu",
-            "standings",
-        )
-    )
+    return any(term in q for term in EXTERNAL_RESEARCH_TERMS)
 
 
 def infer_capability_names(query: str) -> list[str]:
     q = query.lower()
     selected: list[str] = []
     for name, spec in capability_specs().items():
-        if name == "capability_gap":
+        if name == "capability_gap" or not spec.auto_execute:
             continue
         if any(keyword in q for keyword in spec.keywords):
             selected.append(name)
@@ -257,21 +279,12 @@ def resolve_capability_gap(query: str, selected: list[str]) -> list[str]:
     specs = capability_specs()
     for name in selected:
         spec = specs.get(name)
-        if spec and not capability_ready(spec):
+        if spec and spec.auto_execute and not capability_ready(spec):
             required = spec.url_env or "connector configuration"
             gaps.append(f"{name} requires {required}")
     if likely_requires_external_data(query):
-        specialized_ready = any(
-            capability_ready(specs[name])
-            for name in selected
-            if name in specs and specs[name].kind == "http_json"
-        )
-        web = specs["web_search"]
-        if not specialized_ready and not capability_ready(web):
-            message = "fresh factual research requires FUSION_WEB_SEARCH_URL"
-            if message not in gaps:
-                gaps.append(message)
-    return gaps
+        gaps.extend(provider_gap_messages(query))
+    return list(dict.fromkeys(gaps))
 
 
 def _validate_connector_url(url: str) -> None:
@@ -379,6 +392,19 @@ class UniversalToolClient:
                 ),
             )
 
+        if spec.kind == "provider_federation":
+            data = await fetch_federated(
+                query,
+                scope,
+                timeout=self.timeout,
+                max_response_bytes=self.max_response_bytes,
+            )
+            return make_evidence_record(
+                tool=tool,
+                source_url="federation://provider-registry",
+                data=data,
+            )
+
         if spec.kind == "local_gap":
             inferred = infer_capability_names(query)
             gaps = resolve_capability_gap(query, inferred)
@@ -386,13 +412,14 @@ class UniversalToolClient:
                 tool=tool,
                 source_url="local://capability-gap",
                 data={
-                    "status": "connector_required",
+                    "status": "provider_required",
                     "query": query,
+                    "provider_domains": provider_domains_for_query(query),
                     "capability_gaps": gaps,
                     "inferred_capabilities": inferred,
                     "message": (
-                        "Fresh factual execution was blocked because the required "
-                        "trusted connector is not configured."
+                        "Fresh factual execution was blocked because no trusted "
+                        "read-only provider was available."
                     ),
                 },
             )
@@ -429,7 +456,7 @@ class UniversalToolClient:
             assert spec.url_env is not None
             url = os.getenv(spec.url_env, "").strip()
             _validate_connector_url(url)
-            headers = {"User-Agent": "OSIRIS-Fusion/1.1 read-only connector"}
+            headers = {"User-Agent": "OSIRIS-Fusion/1.2 read-only connector"}
             if spec.api_key_env:
                 api_key = os.getenv(spec.api_key_env, "").strip()
                 if api_key:
