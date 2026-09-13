@@ -32,8 +32,8 @@ def test_liquid_verified_token_stays_low_risk() -> None:
     score, warnings = token_risk_score(
         name="Example",
         symbol="EX",
-        price_usd=Decimal("1"),
-        liquidity_usd=Decimal("1000000"),
+        price_usd=Decimal(1),
+        liquidity_usd=Decimal(1000000),
         verified=True,
     )
     assert score == 0
