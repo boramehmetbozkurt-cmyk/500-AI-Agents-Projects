@@ -1,0 +1,21 @@
+{
+  "opportunities": [
+    {
+      "id": "example-official-claim",
+      "title": "Replace with a verified official claim campaign",
+      "chain": "base",
+      "reward_symbol": null,
+      "status": "unknown",
+      "estimated_value_usd": null,
+      "estimated_gas_usd": null,
+      "official_url": "https://example.com/official-claim",
+      "evidence": [
+        "This is a template entry only. Do not mark confirmed without an official eligibility check."
+      ],
+      "risk_score": 80,
+      "risk_reasons": [
+        "Template entry; not a real claim"
+      ]
+    }
+  ]
+}
