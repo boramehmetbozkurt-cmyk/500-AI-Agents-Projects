@@ -1,0 +1,24 @@
+[
+  {
+    "id": "metamask-eligible-airdrops",
+    "name": "MetaMask Eligible Airdrops",
+    "source_url": "https://portfolio.metamask.io/",
+    "chains": ["ethereum", "base", "arbitrum", "optimism", "polygon"],
+    "allowed_domains": ["metamask.io"],
+    "notes": [
+      "MetaMask Portfolio uses a connected public address and on-chain history to surface eligible airdrops.",
+      "This entry is manual_check because MetaMask does not expose a public generic eligibility API for Wallet Hunter to call directly."
+    ]
+  },
+  {
+    "id": "metamask-rewards-benefits",
+    "name": "MetaMask Rewards Benefits",
+    "source_url": "https://support.metamask.io/tr/trade/metamask-rewards/what-is-metamask-rewards/",
+    "chains": ["ethereum", "base", "arbitrum", "optimism", "polygon"],
+    "allowed_domains": ["metamask.io"],
+    "notes": [
+      "Benefits are account-specific one-time offers shown in MetaMask Mobile when eligible.",
+      "Region and campaign restrictions can apply."
+    ]
+  }
+]
