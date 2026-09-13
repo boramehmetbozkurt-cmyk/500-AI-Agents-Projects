@@ -1,7 +1,7 @@
 from __future__ import annotations
 
+import decimal
 import urllib.parse
-from decimal import Decimal
 
 
 SPAM_MARKERS = ("claim", "airdrop", "visit", "http", ".com", ".xyz", "reward")
@@ -11,8 +11,8 @@ def token_risk_score(
     *,
     name: str,
     symbol: str,
-    price_usd: Decimal | None,
-    liquidity_usd: Decimal | None,
+    price_usd: decimal.Decimal | None,
+    liquidity_usd: decimal.Decimal | None,
     verified: bool | None,
 ) -> tuple[int, list[str]]:
     score = 0
@@ -31,13 +31,13 @@ def token_risk_score(
     if liquidity_usd is None:
         score += 20
         warnings.append("no DEX liquidity evidence found")
-    elif liquidity_usd < Decimal(10000):
+    elif liquidity_usd < decimal.Decimal(10000):
         score += 25
         warnings.append("very low DEX liquidity")
-    elif liquidity_usd < Decimal(50000):
+    elif liquidity_usd < decimal.Decimal(50000):
         score += 15
         warnings.append("low DEX liquidity")
-    elif liquidity_usd < Decimal(250000):
+    elif liquidity_usd < decimal.Decimal(250000):
         score += 5
         warnings.append("limited DEX liquidity")
 
