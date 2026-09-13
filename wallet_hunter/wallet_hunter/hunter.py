@@ -2,18 +2,19 @@ from __future__ import annotations
 
 import asyncio
 import re
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 import httpx
 
 from .chains import CHAINS, ChainConfig
 from .models import ChainSnapshot, Opportunity, ScanReport, TokenPosition
-from .providers import BlockscoutClient, DexScreenerClient
+from .providers import BlockscoutClient, DexScreenerClient, ProviderError
 from .registry import load_registry, spec_to_opportunity
 from .risk import token_risk_score
 
 ADDRESS_RE = re.compile(r"^0x[a-fA-F0-9]{40}$")
+PROVIDER_EXCEPTIONS = (httpx.HTTPError, ProviderError, ValueError, TypeError)
 
 
 def validate_address(address: str) -> str:
@@ -40,7 +41,7 @@ class WalletHunter:
                 self.blockscout.counters(client, chain, address),
                 self.blockscout.token_balances(client, chain, address),
             )
-        except Exception as exc:  # provider isolation: one chain must not kill the report
+        except PROVIDER_EXCEPTIONS as exc:
             return ChainSnapshot(
                 chain=chain.key,
                 address=address,
@@ -51,10 +52,12 @@ class WalletHunter:
 
         native_amount = self.blockscout.parse_native_amount(info)
         native_price = None
-        try:
-            native_price = Decimal(str(info["exchange_rate"])) if info.get("exchange_rate") not in (None, "") else None
-        except Exception:
-            native_price = None
+        rate = info.get("exchange_rate")
+        if rate not in (None, ""):
+            try:
+                native_price = Decimal(str(rate))
+            except (InvalidOperation, ValueError, TypeError):
+                native_price = None
 
         snapshot = ChainSnapshot(
             chain=chain.key,
@@ -71,47 +74,53 @@ class WalletHunter:
         parsed = [item for item in parsed if item["contract"] and item["amount"] > 0]
         parsed = parsed[: self.max_tokens_per_chain]
 
-        async def enrich(item: dict) -> TokenPosition:
+        async def enrich(item: dict[str, object]) -> TokenPosition:
             price = item["exchange_rate"]
             liquidity = None
             evidence = [
                 f"{chain.blockscout_base_url}/address/{address}?tab=tokens",
                 f"{chain.blockscout_base_url}/token/{item['contract']}",
             ]
+            market_warning = None
             try:
-                market = await self.dex.token_market(client, chain, item["contract"])
+                market = await self.dex.token_market(client, chain, str(item["contract"]))
                 if market.get("price_usd") is not None:
                     price = market["price_usd"]
                 liquidity = market.get("liquidity_usd")
                 if market.get("evidence"):
                     evidence.append(str(market["evidence"]))
-            except Exception:
-                pass
+            except PROVIDER_EXCEPTIONS as exc:
+                market_warning = f"market enrichment unavailable: {type(exc).__name__}"
 
-            value = item["amount"] * price if price is not None else None
+            amount = item["amount"]
+            value = amount * price if isinstance(amount, Decimal) and isinstance(price, Decimal) else None
             risk, warnings = token_risk_score(
-                name=item["name"],
-                symbol=item["symbol"],
-                price_usd=price,
-                liquidity_usd=liquidity,
-                verified=item["verified"],
+                name=str(item["name"]),
+                symbol=str(item["symbol"]),
+                price_usd=price if isinstance(price, Decimal) else None,
+                liquidity_usd=liquidity if isinstance(liquidity, Decimal) else None,
+                verified=item["verified"] if isinstance(item["verified"], bool) else None,
             )
+            if market_warning:
+                warnings.append(market_warning)
             return TokenPosition(
                 chain=chain.key,
-                contract=item["contract"],
-                name=item["name"],
-                symbol=item["symbol"],
-                amount=item["amount"],
-                price_usd=price,
+                contract=str(item["contract"]),
+                name=str(item["name"]),
+                symbol=str(item["symbol"]),
+                amount=amount if isinstance(amount, Decimal) else Decimal(0),
+                price_usd=price if isinstance(price, Decimal) else None,
                 value_usd=value,
-                liquidity_usd=liquidity,
-                verified=item["verified"],
+                liquidity_usd=liquidity if isinstance(liquidity, Decimal) else None,
+                verified=item["verified"] if isinstance(item["verified"], bool) else None,
                 risk_score=risk,
                 warnings=warnings,
                 evidence=evidence,
             )
 
-        snapshot.tokens = await asyncio.gather(*(enrich(item) for item in parsed)) if parsed else []
+        snapshot.tokens = (
+            await asyncio.gather(*(enrich(item) for item in parsed)) if parsed else []
+        )
         snapshot.tokens.sort(key=lambda token: token.value_usd or Decimal(0), reverse=True)
         return snapshot
 
@@ -127,28 +136,51 @@ class WalletHunter:
         results: list[Opportunity] = []
         for spec in specs:
             if not spec.eligibility_url_template:
-                results.append(spec_to_opportunity(spec, "manual_check", ["No official machine-readable eligibility endpoint is configured."]))
+                results.append(
+                    spec_to_opportunity(
+                        spec,
+                        "manual_check",
+                        ["No official machine-readable eligibility endpoint is configured."],
+                    )
+                )
                 continue
             url = spec.eligibility_url_template.replace("{address}", address)
             try:
                 response = await client.get(url, timeout=10.0, follow_redirects=False)
                 response.raise_for_status()
-                payload = response.json()
-                eligible = _extract_eligible(payload)
-                status = "eligible" if eligible is True else "not_eligible" if eligible is False else "manual_check"
+                eligible = _extract_eligible(response.json())
+                if eligible is True:
+                    status = "eligible"
+                elif eligible is False:
+                    status = "not_eligible"
+                else:
+                    status = "manual_check"
                 notes = [f"Eligibility endpoint checked: {url}"]
                 results.append(spec_to_opportunity(spec, status, notes))
                 results[-1].evidence.append(url)
-            except Exception as exc:
-                results.append(spec_to_opportunity(spec, "manual_check", [f"Eligibility check failed: {type(exc).__name__}"]))
+            except (httpx.HTTPError, ValueError, TypeError) as exc:
+                results.append(
+                    spec_to_opportunity(
+                        spec,
+                        "manual_check",
+                        [f"Eligibility check failed: {type(exc).__name__}"],
+                    )
+                )
         return results
 
-    async def scan(self, address: str, *, registry_path: str | Path | None = None) -> ScanReport:
+    async def scan(
+        self,
+        address: str,
+        *,
+        registry_path: str | Path | None = None,
+    ) -> ScanReport:
         address = validate_address(address)
         headers = {"User-Agent": "wallet-hunter/0.1"}
         async with httpx.AsyncClient(headers=headers) as client:
             chains, opportunities = await asyncio.gather(
-                asyncio.gather(*(self._scan_chain(client, chain, address) for chain in CHAINS.values())),
+                asyncio.gather(
+                    *(self._scan_chain(client, chain, address) for chain in CHAINS.values())
+                ),
                 self._load_opportunities(client, address, registry_path),
             )
 
@@ -174,7 +206,7 @@ class WalletHunter:
             opportunities=opportunities,
             total_known_value_usd=total,
             warnings=[
-                "Unknown or spam tokens can display fake prices. Never use this report as permission to sign a transaction.",
+                "Unknown or spam tokens can display fake prices. Never sign from this report alone.",
                 "Seed phrases/private keys are never required by Wallet Hunter.",
             ],
         )
