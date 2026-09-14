@@ -57,6 +57,7 @@ class Opportunity(BaseModel):
     title: str
     chain: str
     reward_symbol: str | None = None
+    reward_contract: str | None = None
     status: Literal["confirmed", "candidate", "unknown", "rejected"] = "unknown"
     estimated_value_usd: float | None = None
     estimated_gas_usd: float | None = None
@@ -65,6 +66,15 @@ class Opportunity(BaseModel):
     evidence: list[str] = Field(default_factory=list)
     risk_score: int = Field(default=50, ge=0, le=100)
     risk_reasons: list[str] = Field(default_factory=list)
+
+    @field_validator("reward_contract")
+    @classmethod
+    def validate_reward_contract(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        if not EVM_ADDRESS_RE.fullmatch(value):
+            raise ValueError("invalid reward contract address")
+        return value.lower()
 
 
 class ChainResult(BaseModel):
