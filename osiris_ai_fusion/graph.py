@@ -105,7 +105,7 @@ def _sanitize_report(report: AnalysisReport, evidence: dict[str, Any]) -> Analys
     claims: list[Claim] = []
     for claim in report.claims:
         refs = [ref for ref in claim.evidence_ids if ref in valid_ids]
-        if claim.kind == "observation" and not refs:
+        if not refs:
             continue
         claims.append(claim.model_copy(update={"evidence_ids": refs}))
     return report.model_copy(update={"claims": claims})
