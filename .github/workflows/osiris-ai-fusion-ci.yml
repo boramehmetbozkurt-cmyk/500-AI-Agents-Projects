@@ -51,6 +51,7 @@ jobs:
           node --check ui/assets/app.js
           node --check ui/assets/atlas.js
           node --check ui/assets/temporal-globe.js
+          node --check ui/assets/science-explorer.js
           node --check saas_ui/assets/app.js
       - name: Import application
         env:
