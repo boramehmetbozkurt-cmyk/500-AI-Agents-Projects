@@ -29,7 +29,9 @@ class WalletScanner:
                 *(self._scan_chain(client, chain, request.address) for chain in chains)
             )
 
-        opportunities = self._rank_opportunities(ManifestOpportunityProvider().load(), results)
+        manifest = ManifestOpportunityProvider().load()
+        scoped = self._scope_opportunities(manifest, chains, request.address)
+        opportunities = self._rank_opportunities(scoped, results)
         warnings: list[str] = []
         if unknown:
             warnings.append(f"Unsupported chains ignored: {', '.join(unknown)}")
@@ -38,7 +40,7 @@ class WalletScanner:
                 "ETHERSCAN_API_KEY is not configured; ERC-20 discovery is limited to native balances."
             )
         warnings.append(
-            "Wallet Hunter never signs or broadcasts transactions. Claimable status must be confirmed by an official eligibility source."
+            "Wallet Hunter never signs or broadcasts transactions. Claimable status must be confirmed by an official eligibility source for the scanned address."
         )
         return WalletReport(
             address=request.address,
@@ -101,21 +103,51 @@ class WalletScanner:
         return result
 
     @staticmethod
+    def _scope_opportunities(
+        opportunities: list[Opportunity],
+        chains: list[str],
+        address: str,
+    ) -> list[Opportunity]:
+        selected = set(chains)
+        normalized_address = address.lower()
+        scoped: list[Opportunity] = []
+        for opportunity in opportunities:
+            if opportunity.chain not in selected:
+                continue
+            item = opportunity.model_copy(deep=True)
+            if item.status == "confirmed" and item.eligibility_address != normalized_address:
+                item.status = "candidate"
+                reason = "Confirmation is not bound to the scanned wallet address"
+                if reason not in item.risk_reasons:
+                    item.risk_reasons.append(reason)
+            scoped.append(item)
+        return scoped
+
+    @staticmethod
     def _rank_opportunities(
         opportunities: list[Opportunity],
         chain_results: list[ChainResult],
     ) -> list[Opportunity]:
-        risk_by_chain: dict[str, int] = {}
+        risk_by_contract: dict[tuple[str, str], int] = {}
         for chain_result in chain_results:
-            penalty = sum(SEVERITY_PENALTY[s.severity] for s in chain_result.security)
-            risk_by_chain[chain_result.chain] = min(100, penalty)
+            for signal in chain_result.security:
+                key = (chain_result.chain, signal.contract.lower())
+                risk_by_contract[key] = min(
+                    100,
+                    risk_by_contract.get(key, 0) + SEVERITY_PENALTY[signal.severity],
+                )
 
         for opportunity in opportunities:
-            opportunity.risk_score = max(opportunity.risk_score, risk_by_chain.get(opportunity.chain, 0))
+            if opportunity.reward_contract:
+                token_risk = risk_by_contract.get(
+                    (opportunity.chain, opportunity.reward_contract.lower()),
+                    0,
+                )
+                opportunity.risk_score = max(opportunity.risk_score, token_risk)
             if opportunity.estimated_value_usd is not None and opportunity.estimated_gas_usd is not None:
                 opportunity.net_value_usd = opportunity.estimated_value_usd - opportunity.estimated_gas_usd
             if opportunity.status != "confirmed":
-                opportunity.risk_reasons.append("Eligibility is not confirmed by an official source")
+                opportunity.risk_reasons.append("Eligibility is not confirmed by an official source for this wallet")
                 opportunity.risk_score = max(opportunity.risk_score, 40)
             if opportunity.net_value_usd is not None and opportunity.net_value_usd <= 0:
                 opportunity.risk_reasons.append("Estimated gas cost is greater than or equal to reward value")
