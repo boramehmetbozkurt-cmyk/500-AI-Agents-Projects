@@ -29,9 +29,11 @@ from osiris_client import FORBIDDEN_ACTIVE_PATHS, READ_ONLY_TOOLS, OsirisClient,
 from planner import deterministic_tools
 from providers import provider_catalog, provider_domains_for_query, route_providers
 from rate_limit import InMemoryRateLimiter
+from reality_atlas import router as reality_atlas_router
 from saas import AuthContext, require_identity, router as saas_router, saas_manager
 from schemas import CaseCreate, InvestigationRequestModel, WatchlistCreate
 from seal import verify_receipt
+from sensor_mesh import ingest_investigation_result, router as sensor_mesh_router
 from source_policy import policy_report
 from store import FusionStore
 from watcher import run_watcher
@@ -63,7 +65,7 @@ app = FastAPI(
     version="1.3.0",
     description=(
         "Multi-tenant public SaaS for evidence-first, authorization-aware AI research "
-        "with domain-agnostic multi-provider federation and a verified living world model."
+        "with provider federation, a verified living world model and BCE-to-future reality atlas."
     ),
     lifespan=lifespan,
 )
@@ -87,6 +89,8 @@ if settings.saas_enabled:
     app.include_router(saas_router)
 
 app.include_router(world_router)
+app.include_router(reality_atlas_router)
+app.include_router(sensor_mesh_router)
 
 
 @app.middleware("http")
@@ -149,6 +153,8 @@ async def health() -> dict[str, Any]:
         "version": app.version,
         "saas": settings.saas_enabled,
         "world": True,
+        "temporal_reality_atlas": True,
+        "sensor_mesh": True,
     }
 
 
@@ -290,6 +296,7 @@ async def investigate_route(
         )
         result["request_id"] = request.headers.get("X-Request-ID") or "generated-by-middleware"
         result["workspace_id"] = auth.tenant_id
+        result["world_ingest"] = ingest_investigation_result(auth.tenant_id, body.query, result)
         if investigation_id:
             result["investigation_id"] = investigation_id
             store.finish_investigation(investigation_id, result)
@@ -338,6 +345,11 @@ async def investigate_stream_route(
                     final = event.get("result")
                     if isinstance(final, dict):
                         final["workspace_id"] = auth.tenant_id
+                        final["world_ingest"] = ingest_investigation_result(
+                            auth.tenant_id,
+                            body.query,
+                            final,
+                        )
                         if investigation_id:
                             final["investigation_id"] = investigation_id
                             store.finish_investigation(investigation_id, final)
