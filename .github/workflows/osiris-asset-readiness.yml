@@ -55,6 +55,18 @@ jobs:
           benchmark = json.loads((root / "orbythra-core-benchmark.json").read_text())
           carveout_receipts = list(root.glob("orbythra-v1.3-carveout-*.receipt.json"))
           archives = list(root.glob("orbythra-v1.3-carveout-*.zip"))
+          legal_required = [
+              "legal/LEGAL_DUE_DILIGENCE.md",
+              "legal/IP_OWNERSHIP_SCHEDULE.md",
+              "legal/THIRD_PARTY_LICENSE_MATRIX.md",
+              "legal/PRIVACY_KVKK_GDPR_POLICY.md",
+              "legal/AI_ACT_COMPLIANCE.md",
+              "legal/TERMS_OF_USE_DRAFT.md",
+              "legal/PROFESSIONAL_USE_DISCLAIMERS.md",
+              "legal/TRADEMARK_CLEARANCE.md",
+              "legal/CLEAN_IP_CARVEOUT_PLAN.md",
+              "legal/DPA_TEMPLATE.md",
+          ]
           assert asset["schema"] == "orbythra.asset-manifest.v1"
           assert asset["file_count"] > 0
           assert asset["root_license"]["present"] is True
@@ -70,6 +82,10 @@ jobs:
           assert len(carveout_receipts) == 1
           assert len(archives) == 1
           assert (root / "orbythra-path-git-provenance.tsv").stat().st_size > 0
+          for legal_path in legal_required:
+              path = Path(legal_path)
+              assert path.is_file(), f"missing legal due-diligence artifact: {legal_path}"
+              assert path.stat().st_size > 200, f"legal artifact unexpectedly small: {legal_path}"
           PY
           python -m pip list --format=json > dist/buyer-dataroom/resolved-python-packages.json
       - name: Upload buyer data-room artifact
