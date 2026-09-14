@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ORBYTHRA Engineering Intelligence</title>
+  <link rel="stylesheet" href="/assets/engineering-lab.css">
+</head>
+<body>
+  <main class="shell">
+    <header>
+      <p class="eyebrow">ORBYTHRA / ENGINEERING INTELLIGENCE</p>
+      <h1>Çok Katmanlı Mühendislik Karar Laboratuvarı</h1>
+      <p>İlk ilkeler, ölçek taraması, TOPRAK/SU/ATEŞ/HAVA, alternatifler, FMEA ve sayısal doğrulama planı.</p>
+    </header>
+    <section class="grid">
+      <form id="engineeringForm" class="panel">
+        <label>API Key<input id="apiKey" type="password" autocomplete="off" placeholder="Tenant API key"></label>
+        <label>Problem<textarea id="problem" required rows="7" placeholder="Tasarlamak veya analiz etmek istediğin teknik problemi yaz."></textarea></label>
+        <div class="cols">
+          <label>Hedef<input id="target" placeholder="Örn. 10 yıl ömür, < 5 kg"></label>
+          <label>Bütçe<input id="budget" placeholder="Örn. 50.000 TL"></label>
+          <label>Adet<input id="quantity" placeholder="Örn. 1000 adet/yıl"></label>
+          <label>Ömür<input id="lifetime" placeholder="Örn. 10 yıl"></label>
+        </div>
+        <label>Çalışma koşulları<textarea id="conditions" rows="3" placeholder="Sıcaklık, nem, titreşim, ortam..."></textarea></label>
+        <label>Standartlar<input id="standards" placeholder="ISO 1101, IEC 60529 ... (virgülle)"></label>
+        <label>Üretim imkânı<textarea id="manufacturing" rows="2" placeholder="CNC, sac büküm, enjeksiyon, 3D baskı..."></textarea></label>
+        <label>Ek kısıtlar<input id="constraints" placeholder="Kütle, boyut, malzeme, regülasyon... (virgülle)"></label>
+        <button type="submit">ORBYTHRA ile analiz et</button>
+      </form>
+      <section class="panel result">
+        <div class="result-head"><h2>Karar çıktısı</h2><span id="status">hazır</span></div>
+        <div id="audit" class="audit"></div>
+        <pre id="answer">Analiz sonucu burada görünecek.</pre>
+      </section>
+    </section>
+  </main>
+  <script src="/assets/engineering-lab.js"></script>
+</body>
+</html>
