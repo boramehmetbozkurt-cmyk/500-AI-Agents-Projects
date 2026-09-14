@@ -4,6 +4,7 @@ import asyncio
 import logging
 
 from graph import investigate
+from sensor_mesh import ingest_investigation_result
 from store import FusionStore
 
 logger = logging.getLogger("osiris_fusion.watcher")
@@ -18,6 +19,13 @@ async def run_watcher(store: FusionStore, poll_seconds: int) -> None:
                         watchlist["query"],
                         requested_tools=watchlist.get("allowed_tools"),
                         scope=watchlist.get("scope", {}),
+                    )
+                    workspace_id = str(watchlist.get("workspace_id") or "default")
+                    ingest_investigation_result(
+                        workspace_id,
+                        str(watchlist["query"]),
+                        result,
+                        sensor_id="fusion_watchlist",
                     )
                     report = result.get("report", {})
                     confidence = float(report.get("overall_confidence", 0.0))
