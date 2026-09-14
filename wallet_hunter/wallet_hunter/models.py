@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import ipaddress
 import re
 from typing import Literal
+from urllib.parse import urlparse
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -52,6 +54,41 @@ class SecuritySignal(BaseModel):
     source: str | None = None
 
 
+class EligibilitySource(BaseModel):
+    """Operator-configured official, read-only wallet eligibility endpoint."""
+
+    url: str
+    method: Literal["GET"] = "GET"
+    address_param: str = Field(default="address", min_length=1, max_length=80)
+    query_params: dict[str, str] = Field(default_factory=dict)
+    result_path: list[str] = Field(min_length=1, max_length=16)
+    eligible_values: list[str] = Field(
+        default_factory=lambda: ["true", "1", "eligible", "claimable", "yes"],
+        min_length=1,
+        max_length=32,
+    )
+    reward_value_path: list[str] = Field(default_factory=list, max_length=16)
+    trusted: bool = False
+    label: str = Field(default="official eligibility", max_length=120)
+
+    @field_validator("url")
+    @classmethod
+    def validate_https_public_url(cls, value: str) -> str:
+        parsed = urlparse(value)
+        if parsed.scheme != "https" or not parsed.hostname:
+            raise ValueError("eligibility source must use an absolute HTTPS URL")
+        host = parsed.hostname.lower()
+        if host == "localhost" or host.endswith(".localhost"):
+            raise ValueError("eligibility source cannot target localhost")
+        try:
+            address = ipaddress.ip_address(host)
+        except ValueError:
+            address = None
+        if address and (address.is_private or address.is_loopback or address.is_link_local or address.is_reserved):
+            raise ValueError("eligibility source cannot target private/reserved IP space")
+        return value
+
+
 class Opportunity(BaseModel):
     id: str
     title: str
@@ -60,6 +97,7 @@ class Opportunity(BaseModel):
     reward_contract: str | None = None
     status: Literal["confirmed", "candidate", "unknown", "rejected"] = "unknown"
     eligibility_address: str | None = None
+    eligibility_source: EligibilitySource | None = None
     estimated_value_usd: float | None = None
     estimated_gas_usd: float | None = None
     net_value_usd: float | None = None
