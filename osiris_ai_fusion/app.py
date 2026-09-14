@@ -60,7 +60,7 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(
     title="OSIRIS Fusion SaaS",
-    version="1.3.1",
+    version="1.3.0",
     description=(
         "Multi-tenant public SaaS for evidence-first, authorization-aware AI research "
         "with domain-agnostic multi-provider federation and a verified living world model."
