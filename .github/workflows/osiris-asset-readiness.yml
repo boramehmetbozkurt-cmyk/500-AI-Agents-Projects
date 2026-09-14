@@ -1,4 +1,4 @@
-name: OSIRIS Asset Readiness
+name: ORBYTHRA Asset Readiness
 
 on:
   pull_request:
@@ -42,22 +42,25 @@ jobs:
         run: |
           python scripts/build_buyer_artifacts.py --output dist/buyer-dataroom
           python scripts/build_asset_carveout.py --output dist/buyer-dataroom > dist/buyer-dataroom/carveout-build-receipt.json
-          python ops_benchmark.py --scientists 250 --works 250 --output dist/buyer-dataroom/osiris-core-benchmark.json > /dev/null
-          git -C .. log --date=iso-strict --pretty=format:'%H%x09%aI%x09%an%x09%ae%x09%s' -- osiris_ai_fusion > dist/buyer-dataroom/osiris-path-git-provenance.tsv
-          git -C .. diff --stat main...HEAD -- osiris_ai_fusion > dist/buyer-dataroom/osiris-vs-main-diffstat.txt || true
+          python ops_benchmark.py --scientists 250 --works 250 --output dist/buyer-dataroom/orbythra-core-benchmark.json > /dev/null
+          git -C .. log --date=iso-strict --pretty=format:'%H%x09%aI%x09%an%x09%ae%x09%s' -- osiris_ai_fusion > dist/buyer-dataroom/orbythra-path-git-provenance.tsv
+          git -C .. diff --stat main...HEAD -- osiris_ai_fusion > dist/buyer-dataroom/orbythra-vs-main-diffstat.txt || true
           python - <<'PY'
           import json
           from pathlib import Path
           root = Path("dist/buyer-dataroom")
-          asset = json.loads((root / "osiris-asset-manifest.json").read_text())
-          sbom = json.loads((root / "osiris-python-sbom.spdx.json").read_text())
-          rights = json.loads((root / "osiris-data-rights.json").read_text())
-          benchmark = json.loads((root / "osiris-core-benchmark.json").read_text())
-          carveout_receipts = list(root.glob("osiris-fusion-v1.3-carveout-*.receipt.json"))
-          archives = list(root.glob("osiris-fusion-v1.3-carveout-*.zip"))
+          asset = json.loads((root / "orbythra-asset-manifest.json").read_text())
+          sbom = json.loads((root / "orbythra-python-sbom.spdx.json").read_text())
+          rights = json.loads((root / "orbythra-data-rights.json").read_text())
+          benchmark = json.loads((root / "orbythra-core-benchmark.json").read_text())
+          carveout_receipts = list(root.glob("orbythra-v1.3-carveout-*.receipt.json"))
+          archives = list(root.glob("orbythra-v1.3-carveout-*.zip"))
+          assert asset["schema"] == "orbythra.asset-manifest.v1"
           assert asset["file_count"] > 0
           assert asset["root_license"]["present"] is True
+          assert asset["engineering_intelligence"]["prompt_version"] == "2.0"
           assert sbom["spdxVersion"] == "SPDX-2.3"
+          assert "ORBYTHRA" in sbom["name"]
           assert len(sbom["packages"]) > 0
           assert len(rights["sources"]) >= 6
           assert benchmark["synthetic"] is True
@@ -66,13 +69,13 @@ jobs:
           assert benchmark["world_bridge"]["entity_events_created"] == 500
           assert len(carveout_receipts) == 1
           assert len(archives) == 1
-          assert (root / "osiris-path-git-provenance.tsv").stat().st_size > 0
+          assert (root / "orbythra-path-git-provenance.tsv").stat().st_size > 0
           PY
           python -m pip list --format=json > dist/buyer-dataroom/resolved-python-packages.json
       - name: Upload buyer data-room artifact
         uses: actions/upload-artifact@v4
         with:
-          name: osiris-buyer-dataroom-${{ github.sha }}
+          name: orbythra-buyer-dataroom-${{ github.sha }}
           path: osiris_ai_fusion/dist/buyer-dataroom
           if-no-files-found: error
           retention-days: 30
