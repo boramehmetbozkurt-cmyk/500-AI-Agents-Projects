@@ -9,8 +9,21 @@
       "estimated_value_usd": null,
       "estimated_gas_usd": null,
       "official_url": "https://example.com/official-claim",
+      "eligibility_source": {
+        "url": "https://claims.example.com/api/eligibility",
+        "method": "GET",
+        "address_param": "address",
+        "query_params": {
+          "campaign": "replace-me"
+        },
+        "result_path": ["data", "eligible"],
+        "eligible_values": ["true", "1", "eligible", "claimable"],
+        "reward_value_path": ["data", "value_usd"],
+        "trusted": false,
+        "label": "Replace with an operator-reviewed official campaign endpoint"
+      },
       "evidence": [
-        "This is a template entry only. Do not mark confirmed without an official eligibility check."
+        "Template entry only. Set trusted=true only after verifying that the endpoint is controlled by the official campaign and is wallet-specific."
       ],
       "risk_score": 80,
       "risk_reasons": [
