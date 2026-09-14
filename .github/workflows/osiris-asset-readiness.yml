@@ -39,6 +39,7 @@ jobs:
       - name: Build buyer artifacts
         run: |
           python scripts/build_buyer_artifacts.py --output dist/buyer-dataroom
+          python ops_benchmark.py --scientists 250 --works 250 --output dist/buyer-dataroom/osiris-core-benchmark.json > /dev/null
           python - <<'PY'
           import json
           from pathlib import Path
@@ -46,11 +47,16 @@ jobs:
           asset = json.loads((root / "osiris-asset-manifest.json").read_text())
           sbom = json.loads((root / "osiris-python-sbom.spdx.json").read_text())
           rights = json.loads((root / "osiris-data-rights.json").read_text())
+          benchmark = json.loads((root / "osiris-core-benchmark.json").read_text())
           assert asset["file_count"] > 0
           assert asset["root_license"]["present"] is True
           assert sbom["spdxVersion"] == "SPDX-2.3"
           assert len(sbom["packages"]) > 0
           assert len(rights["sources"]) >= 6
+          assert benchmark["synthetic"] is True
+          assert benchmark["entity_ingest"]["written"] == 500
+          assert benchmark["relationship_rebuild"]["edges_written"] > 0
+          assert benchmark["world_bridge"]["entity_events_created"] == 500
           PY
           python -m pip list --format=json > dist/buyer-dataroom/resolved-python-packages.json
       - name: Upload buyer data-room artifact
