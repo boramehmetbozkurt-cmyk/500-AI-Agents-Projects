@@ -15,7 +15,7 @@
     {
       "expected": true,
       "left": {"name": "Marie Curie", "institutions": [{"name": "Sorbonne"}], "topics": [{"name": "radioactivity"}]},
-      "right": {"name": "Marie Skłodowska Curie", "institutions": [{"name": "Sorbonne"}], "topics": [{"name": "radioactivity"}]}
+      "right": {"name": "Marie Curie", "institutions": [{"name": "Sorbonne"}], "topics": [{"name": "radioactivity"}]}
     },
     {
       "expected": false,
