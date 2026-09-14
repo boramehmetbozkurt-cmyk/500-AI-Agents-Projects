@@ -1,0 +1,67 @@
+{
+  "schema": "orbythra.science-resolution-benchmark.v1",
+  "note": "Curated deterministic regression cases. This is not an independent real-world validation study.",
+  "scientists": [
+    {
+      "expected": true,
+      "left": {"name": "Ada Lovelace", "orcid": "0000-0001-1111-1111"},
+      "right": {"name": "Augusta Ada King", "orcid": "https://orcid.org/0000-0001-1111-1111"}
+    },
+    {
+      "expected": false,
+      "left": {"name": "Alex Kim", "orcid": "0000-0001-0000-0001"},
+      "right": {"name": "Alex Kim", "orcid": "0000-0001-0000-0002"}
+    },
+    {
+      "expected": true,
+      "left": {"name": "Marie Curie", "institutions": [{"name": "Sorbonne"}], "topics": [{"name": "radioactivity"}]},
+      "right": {"name": "Marie Skłodowska Curie", "institutions": [{"name": "Sorbonne"}], "topics": [{"name": "radioactivity"}]}
+    },
+    {
+      "expected": false,
+      "left": {"name": "John Smith", "institutions": [{"name": "Institute A"}]},
+      "right": {"name": "John Smith", "institutions": [{"name": "Institute B"}], "date_of_birth": "1970-01-01"}
+    }
+  ],
+  "genes": [
+    {
+      "expected": true,
+      "left": {"name": "BRCA1", "seq_region_name": "17", "species": "homo_sapiens"},
+      "right": {"name": "BRCA1", "chromosomes": ["17"], "taxname": "human"}
+    },
+    {
+      "expected": true,
+      "left": {"name": "TP53", "seq_region_name": "17", "species": "homo_sapiens"},
+      "right": {"name": "TP53", "chromosomes": ["17"], "taxname": "human"}
+    },
+    {
+      "expected": false,
+      "left": {"name": "BRCA1", "seq_region_name": "17", "species": "homo_sapiens"},
+      "right": {"name": "BRCA2", "chromosomes": ["13"], "taxname": "human"}
+    }
+  ],
+  "gene_protein": [
+    {
+      "expected": true,
+      "gene": {"name": "BRCA1"},
+      "protein": {"genes": ["BRCA1"], "name": "Breast cancer type 1 susceptibility protein"}
+    },
+    {
+      "expected": false,
+      "gene": {"name": "BRCA1"},
+      "protein": {"genes": ["TP53"], "name": "Cellular tumor antigen p53"}
+    }
+  ],
+  "variant_gene": [
+    {
+      "expected": true,
+      "variant": {"genes": [{"symbol": "BRCA1"}]},
+      "gene": {"name": "BRCA1"}
+    },
+    {
+      "expected": false,
+      "variant": {"genes": [{"symbol": "BRCA2"}]},
+      "gene": {"name": "BRCA1"}
+    }
+  ]
+}
