@@ -82,7 +82,7 @@ class EtherscanV2Provider:
             response.raise_for_status()
             payload = response.json()
             if not isinstance(payload, dict):
-                raise RuntimeError("Etherscan returned a non-object response")
+                raise TypeError("Etherscan returned a non-object response")
 
             rows = payload.get("result")
             status = str(payload.get("status", ""))
@@ -99,7 +99,7 @@ class EtherscanV2Provider:
             if status not in {"", "1"}:
                 raise RuntimeError(f"Etherscan API failure: {message or status}")
             if not isinstance(rows, list):
-                raise RuntimeError(
+                raise TypeError(
                     f"Etherscan API failure: {message or 'result is not a transaction list'}"
                 )
 
