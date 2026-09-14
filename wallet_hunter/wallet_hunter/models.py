@@ -59,6 +59,7 @@ class Opportunity(BaseModel):
     reward_symbol: str | None = None
     reward_contract: str | None = None
     status: Literal["confirmed", "candidate", "unknown", "rejected"] = "unknown"
+    eligibility_address: str | None = None
     estimated_value_usd: float | None = None
     estimated_gas_usd: float | None = None
     net_value_usd: float | None = None
@@ -67,13 +68,13 @@ class Opportunity(BaseModel):
     risk_score: int = Field(default=50, ge=0, le=100)
     risk_reasons: list[str] = Field(default_factory=list)
 
-    @field_validator("reward_contract")
+    @field_validator("reward_contract", "eligibility_address")
     @classmethod
-    def validate_reward_contract(cls, value: str | None) -> str | None:
+    def validate_optional_evm_address(cls, value: str | None) -> str | None:
         if value is None:
             return None
         if not EVM_ADDRESS_RE.fullmatch(value):
-            raise ValueError("invalid reward contract address")
+            raise ValueError("invalid EVM address")
         return value.lower()
 
 
