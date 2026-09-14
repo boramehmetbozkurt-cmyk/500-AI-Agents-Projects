@@ -179,8 +179,10 @@ async def build_plan(
     settings = get_settings()
     available = auto_tool_names()
     tools = deterministic_tools(query, requested_tools)
-    region = scope.get("region")
-    time_range = scope.get("time_range") or infer_time_range(query)
+    caller_region = scope.get("region")
+    caller_time_range = scope.get("time_range")
+    region = caller_region
+    time_range = caller_time_range or infer_time_range(query)
     question_type = infer_question_type(query)
     model_meta = {"provider": "deterministic", "model": "provider-federation-router-v2"}
     deterministic_external = "provider_federation" in tools
@@ -224,8 +226,10 @@ async def build_plan(
                 ):
                     valid = ["provider_federation"]
                 tools = valid[: settings.max_tool_calls]
-                region = candidate.region or region
-                time_range = candidate.time_range or time_range
+                if not caller_region:
+                    region = candidate.region or region
+                if not caller_time_range:
+                    time_range = candidate.time_range or time_range
                 question_type = candidate.question_type
                 model_meta = {
                     "provider": model_result.provider,
