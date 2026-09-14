@@ -3,9 +3,14 @@ from __future__ import annotations
 import argparse
 import json
 import shutil
+import sys
 from pathlib import Path
 
-from reality_atlas import (
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from reality_atlas import (  # noqa: E402
     AtlasFeatureCreate,
     CoordinateSpace,
     GeoPoseAnchor,
@@ -13,8 +18,8 @@ from reality_atlas import (
     RealityAtlasStore,
     TemporalExtent,
 )
-from science_world import ScienceGraphStore
-from world import WorldEventCreate, WorldForkCreate, WorldStore
+from science_world import ScienceGraphStore  # noqa: E402
+from world import WorldEventCreate, WorldForkCreate, WorldStore  # noqa: E402
 
 
 def build_demo(output: Path) -> dict[str, object]:
@@ -185,7 +190,7 @@ def build_demo(output: Path) -> dict[str, object]:
             f"FUSION_STORE_PATH={db_path.as_posix()} uvicorn app:app --host 127.0.0.1 --port 8787"
         ),
         "entrypoints": [
-            "/app",
+            "/",
             "/world-globe",
             "/science-explorer",
             "/engineering-lab",
