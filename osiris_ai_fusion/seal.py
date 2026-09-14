@@ -230,9 +230,13 @@ def verify_receipt(receipt: dict[str, Any]) -> bool:
     if not signature_b64 or not public_key_b64:
         return False
     unsigned = {key: value for key, value in receipt.items() if key != "signature_b64"}
-    public_key = Ed25519PublicKey.from_public_bytes(base64.b64decode(public_key_b64))
     try:
-        public_key.verify(base64.b64decode(signature_b64), _receipt_signing_bytes(unsigned))
+        raw_public_key = base64.b64decode(public_key_b64, validate=True)
+        if len(raw_public_key) != 32:
+            return False
+        public_key = Ed25519PublicKey.from_public_bytes(raw_public_key)
+        signature = base64.b64decode(signature_b64, validate=True)
+        public_key.verify(signature, _receipt_signing_bytes(unsigned))
         return True
     except Exception:
         return False
