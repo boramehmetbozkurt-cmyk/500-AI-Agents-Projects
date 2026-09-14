@@ -10,13 +10,14 @@ select = ["E", "F", "I", "B", "UP"]
 # correctness is enforced by pytest, import checks, dependency audit and Docker CI.
 ignore = ["E501", "UP035", "UP037", "UP012", "B904"]
 
-# FastAPI intentionally evaluates Depends(...) in route signatures. Ruff B008 is
-# not applicable to that dependency-injection pattern. Existing SaaS import-only
-# exceptions are isolated to the two framework entry modules instead of being
-# disabled repository-wide.
+# FastAPI intentionally evaluates Depends/Query in route signatures. Ruff B008 is
+# not applicable to that dependency-injection pattern. Import-only exceptions remain
+# isolated to framework entry modules and the new World integration modules.
 [tool.ruff.lint.per-file-ignores]
 "app.py" = ["B008", "I001"]
 "saas.py" = ["B008", "I001", "F401"]
+"reality_atlas.py" = ["B008", "F401"]
+"sensor_mesh.py" = ["I001"]
 "tests/test_atlas.py" = ["I001"]
 
 [tool.pytest.ini_options]
