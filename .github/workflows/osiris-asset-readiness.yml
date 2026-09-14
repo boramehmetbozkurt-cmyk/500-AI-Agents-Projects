@@ -1,0 +1,62 @@
+name: OSIRIS Asset Readiness
+
+on:
+  pull_request:
+    paths:
+      - "osiris_ai_fusion/**"
+      - ".github/workflows/osiris-asset-readiness.yml"
+  push:
+    branches:
+      - main
+      - osiris-fusion-v1-release
+    paths:
+      - "osiris_ai_fusion/**"
+      - ".github/workflows/osiris-asset-readiness.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  buyer-dataroom:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: osiris_ai_fusion
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: |
+            osiris_ai_fusion/requirements.txt
+            osiris_ai_fusion/requirements-dev.txt
+      - name: Install resolved runtime
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+          pip check
+      - name: Build buyer artifacts
+        run: |
+          python scripts/build_buyer_artifacts.py --output dist/buyer-dataroom
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          root = Path("dist/buyer-dataroom")
+          asset = json.loads((root / "osiris-asset-manifest.json").read_text())
+          sbom = json.loads((root / "osiris-python-sbom.spdx.json").read_text())
+          rights = json.loads((root / "osiris-data-rights.json").read_text())
+          assert asset["file_count"] > 0
+          assert asset["root_license"]["present"] is True
+          assert sbom["spdxVersion"] == "SPDX-2.3"
+          assert len(sbom["packages"]) > 0
+          assert len(rights["sources"]) >= 6
+          PY
+          python -m pip list --format=json > dist/buyer-dataroom/resolved-python-packages.json
+      - name: Upload buyer data-room artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: osiris-buyer-dataroom-${{ github.sha }}
+          path: osiris_ai_fusion/dist/buyer-dataroom
+          if-no-files-found: error
+          retention-days: 30
