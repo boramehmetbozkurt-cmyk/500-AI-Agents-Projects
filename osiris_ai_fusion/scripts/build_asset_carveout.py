@@ -48,22 +48,27 @@ def build_carveout(output_dir: str | Path) -> dict[str, Any]:
     commit = os.getenv("GITHUB_SHA") or "unknown"
     generated = datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     short = commit[:12] if commit != "unknown" else "local"
-    archive = output / f"osiris-fusion-v1.3-carveout-{short}.zip"
+    archive = output / f"orbythra-v1.3-carveout-{short}.zip"
     files = source_files()
     manifest_files: list[dict[str, Any]] = []
 
-    with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as bundle:
+    with zipfile.ZipFile(
+        archive,
+        "w",
+        compression=zipfile.ZIP_DEFLATED,
+        compresslevel=9,
+    ) as bundle:
         for path in files:
             relative = path.relative_to(ROOT).as_posix()
             data = path.read_bytes()
-            archive_path = f"osiris_ai_fusion/{relative}"
+            archive_path = f"orbythra/{relative}"
             bundle.writestr(archive_path, data)
             manifest_files.append(
                 {
                     "path": archive_path,
                     "bytes": len(data),
                     "sha256": sha256_bytes(data),
-                    "classification": "osiris_component_or_documentation",
+                    "classification": "orbythra_component_or_documentation",
                 }
             )
 
@@ -81,10 +86,12 @@ def build_carveout(output_dir: str | Path) -> dict[str, Any]:
             )
 
         carveout_readme = (
-            "OSIRIS Fusion v1.3 asset carve-out candidate\n\n"
-            "This archive isolates the OSIRIS application subtree for buyer review. "
+            "ORBYTHRA v1.3 asset carve-out candidate\n\n"
+            "This archive isolates the ORBYTHRA application subtree for buyer review. "
             "It is not a legal certification of exclusive ownership. Review THIRD_PARTY_NOTICES.md, "
             "the included upstream MIT license, generated SBOM/data-rights artifacts and Git provenance.\n\n"
+            "The repository source directory may retain legacy osiris_ai_fusion naming for backward compatibility; "
+            "the product and acquisition-facing brand is ORBYTHRA.\n\n"
             "Excluded by design: local databases, backups, caches, private keys, .env files and generated dist output.\n"
         ).encode("utf-8")
         bundle.writestr("CARVEOUT-README.txt", carveout_readme)
@@ -98,8 +105,8 @@ def build_carveout(output_dir: str | Path) -> dict[str, Any]:
         )
 
         manifest = {
-            "schema": "osiris.asset-carveout.v1",
-            "product": "OSIRIS Fusion / OSIRIS World",
+            "schema": "orbythra.asset-carveout.v1",
+            "product": "ORBYTHRA — Verifiable Temporal Reality Operating System",
             "version": "1.3.0",
             "commit": commit,
             "generated_at": generated,
@@ -115,7 +122,9 @@ def build_carveout(output_dir: str | Path) -> dict[str, Any]:
                 "subject to its licenses and is not represented as exclusive proprietary IP."
             ),
         }
-        manifest_bytes = (json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True) + "\n").encode("utf-8")
+        manifest_bytes = (
+            json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+        ).encode("utf-8")
         bundle.writestr("CARVEOUT-MANIFEST.json", manifest_bytes)
 
     archive_hash = hashlib.sha256(archive.read_bytes()).hexdigest()
@@ -136,10 +145,17 @@ def build_carveout(output_dir: str | Path) -> dict[str, Any]:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Build OSIRIS-only asset carve-out ZIP")
+    parser = argparse.ArgumentParser(description="Build ORBYTHRA asset carve-out ZIP")
     parser.add_argument("--output", default="dist/buyer-dataroom")
     args = parser.parse_args()
-    print(json.dumps(build_carveout(args.output), ensure_ascii=False, indent=2, sort_keys=True))
+    print(
+        json.dumps(
+            build_carveout(args.output),
+            ensure_ascii=False,
+            indent=2,
+            sort_keys=True,
+        )
+    )
 
 
 if __name__ == "__main__":
