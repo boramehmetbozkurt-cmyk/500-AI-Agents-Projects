@@ -441,7 +441,7 @@ class SaaSManager:
             ).fetchone()["n"]
             if active >= limit:
                 raise PermissionError("API key limit reached for your plan")
-            raw = "osf_live_" + secrets.token_urlsafe(30)
+            raw = "orb_live_" + secrets.token_urlsafe(30)
             now = int(time.time())
             key_id = self._id("key")
             conn.execute(
@@ -462,7 +462,7 @@ class SaaSManager:
                 WHERE tenant_id=? AND revoked_at IS NULL
                 ORDER BY created_at DESC
                 """,
-                (auth.tenant_id,),
+            (auth.tenant_id,),
             ).fetchall()
         return [dict(row) for row in rows]
 
