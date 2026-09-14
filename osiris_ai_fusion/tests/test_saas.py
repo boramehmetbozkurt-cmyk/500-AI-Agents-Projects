@@ -34,7 +34,7 @@ def test_api_key_is_hashed_and_revocable(tmp_path):
     created = manager.signup("owner@example.com", "long-secure-password", "Owner", "Acme")
     auth = manager.authenticate(f"Bearer {created['token']}", None)
     api_key = manager.create_api_key(auth, "CLI")
-    assert api_key["api_key"].startswith("osf_live_")
+    assert api_key["api_key"].startswith("orb_live_")
     via_key = manager.authenticate(None, api_key["api_key"])
     assert via_key.tenant_id == auth.tenant_id
     with sqlite3.connect(manager.path) as conn:
