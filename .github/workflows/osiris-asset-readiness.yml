@@ -39,6 +39,8 @@ jobs:
           pip install -r requirements-dev.txt
           pip check
       - name: Build buyer artifacts
+        env:
+          SEAL_ED25519_PRIVATE_KEY_B64: ${{ secrets.SEAL_ED25519_PRIVATE_KEY_B64 }}
         run: |
           python scripts/build_buyer_artifacts.py --output dist/buyer-dataroom
           python scripts/build_asset_carveout.py --output dist/buyer-dataroom > dist/buyer-dataroom/carveout-build-receipt.json
