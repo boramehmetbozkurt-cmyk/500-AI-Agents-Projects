@@ -1,6 +1,6 @@
 # Wallet Hunter
 
-Standalone, read-only EVM wallet intelligence service for finding and ranking **real-value claim/quest candidates** without ever handling a seed phrase or private key.
+Standalone, read-only EVM wallet intelligence service designed as a specialist **ORBYTHRA sensor/module** while remaining independently deployable. It finds and ranks **real-value claim/quest candidates** without ever handling a seed phrase or private key.
 
 ## What it does
 
