@@ -12,7 +12,7 @@ ignore = ["E501", "UP035", "UP037", "UP012", "B904"]
 
 # FastAPI intentionally evaluates Depends/Query in route signatures. Ruff B008 is
 # not applicable to that dependency-injection pattern. Import-only exceptions remain
-# isolated to framework entry modules and the new World integration module.
+# isolated to framework entry modules and the Sensor Mesh integration module.
 [tool.ruff.lint.per-file-ignores]
 "app.py" = ["B008", "I001"]
 "saas.py" = ["B008", "I001", "F401"]
