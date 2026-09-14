@@ -1,4 +1,4 @@
-name: OSIRIS AI Fusion CI
+name: ORBYTHRA CI
 
 on:
   pull_request:
@@ -52,10 +52,11 @@ jobs:
           node --check ui/assets/atlas.js
           node --check ui/assets/temporal-globe.js
           node --check ui/assets/science-explorer.js
+          node --check ui/assets/engineering-lab.js
           node --check saas_ui/assets/app.js
       - name: Import application
         env:
           UI_ENABLED: "true"
           SAAS_ENABLED: "true"
           AI_PLANNER_ENABLED: "false"
-        run: python -c "import app; assert app.app.version == '1.3.0'"
+        run: python -c "import app; assert app.app.version == '1.3.0'; assert 'ORBYTHRA' in app.app.title"
