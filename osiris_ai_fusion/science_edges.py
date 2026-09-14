@@ -12,6 +12,7 @@ from fastapi import APIRouter, Depends, Query
 
 from config import get_settings
 from saas import AuthContext, require_identity
+from science_world_bridge import bridge_store
 
 
 def _edge_key(source_key: str, relation: str, target_key: str, source_id: str) -> str:
@@ -325,4 +326,14 @@ async def rebuild_science_graph(
     limit: int = Query(default=100000, ge=1, le=1000000),
 ) -> dict[str, Any]:
     result = edge_store.rebuild(auth.tenant_id, limit=limit)
-    return {"workspace_id": auth.tenant_id, "status": "rebuilt", **result}
+    world_bridge = bridge_store.sync(
+        auth.tenant_id,
+        entity_limit=limit,
+        edge_limit=min(limit * 4, 1_000_000),
+    )
+    return {
+        "workspace_id": auth.tenant_id,
+        "status": "rebuilt_and_synced",
+        **result,
+        "world_bridge": world_bridge,
+    }
