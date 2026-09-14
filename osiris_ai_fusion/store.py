@@ -12,6 +12,46 @@ from config import get_settings
 from provenance import sha256_hex
 
 
+def _stable_alert_content(result: dict[str, Any]) -> dict[str, Any]:
+    report = result.get("report") if isinstance(result, dict) else None
+    raw_claims = report.get("claims", []) if isinstance(report, dict) else []
+    claims = sorted(
+        [
+            {
+                "text": claim.get("text"),
+                "kind": claim.get("kind"),
+                "confidence": claim.get("confidence"),
+            }
+            for claim in raw_claims
+            if isinstance(claim, dict)
+        ],
+        key=lambda item: (
+            str(item.get("kind") or ""),
+            str(item.get("text") or ""),
+            str(item.get("confidence") or ""),
+        ),
+    )
+
+    raw_evidence = result.get("evidence", {}) if isinstance(result, dict) else {}
+    evidence = []
+    if isinstance(raw_evidence, dict):
+        for key, record in sorted(raw_evidence.items()):
+            if not isinstance(record, dict):
+                continue
+            evidence.append(
+                {
+                    "key": key,
+                    "tool": record.get("tool"),
+                    "source_url": record.get("source_url"),
+                    "ok": record.get("ok"),
+                    "data": record.get("data"),
+                    "error": record.get("error"),
+                }
+            )
+
+    return {"claims": claims, "evidence": evidence}
+
+
 class FusionStore:
     def __init__(self, path: str | None = None) -> None:
         self.path = path or get_settings().store_path
@@ -177,7 +217,7 @@ class FusionStore:
             conn.commit()
 
     def create_alert(self, watchlist: dict[str, Any], summary: str, result: dict[str, Any], severity: str = "info") -> dict[str, Any] | None:
-        digest = sha256_hex(result)
+        digest = sha256_hex(_stable_alert_content(result))
         with self._lock, self._connect() as conn:
             duplicate = conn.execute("SELECT id FROM alerts WHERE watchlist_id=? AND result_digest=? LIMIT 1", (watchlist["id"], digest)).fetchone()
             if duplicate:
