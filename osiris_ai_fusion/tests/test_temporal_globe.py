@@ -7,7 +7,7 @@ def test_temporal_globe_assets_are_wired_to_atlas_api():
     js = (root / "ui" / "assets" / "temporal-globe.js").read_text(encoding="utf-8")
     css = root / "ui" / "assets" / "temporal-globe.css"
 
-    assert "OSIRIS Temporal Globe" in html
+    assert "ORBYTHRA Temporal Globe" in html
     assert 'data-mode="physical"' in html
     assert 'data-mode="history"' in html
     assert 'data-mode="digital"' in html
