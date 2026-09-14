@@ -1,15 +1,15 @@
-# OSIRIS Asset Sale Readiness
+# ORBYTHRA Asset Sale Readiness
 
-This document is a technical/commercial due-diligence register. It is not a valuation certificate and does not claim that OSIRIS is worth any specific amount.
+This document is a technical/commercial due-diligence register. It is not a valuation certificate and does not claim that ORBYTHRA is worth any specific amount.
 
 ## Sale thesis
 
-OSIRIS is positioned as a strategic technology/IP asset rather than a generic pre-revenue SaaS listing:
+ORBYTHRA is positioned as a strategic technology/IP asset rather than a generic pre-revenue SaaS listing:
 
 - evidence-first research/orchestration engine
 - multi-tenant Public SaaS
 - provider federation
-- OSIRIS World verified living-world model
+- ORBYTHRA World verified living-world model
 - bitemporal Time Machine
 - World Fork counterfactual engine
 - World Sensor Mesh
@@ -17,9 +17,12 @@ OSIRIS is positioned as a strategic technology/IP asset rather than a generic pr
 - Temporal Globe
 - Science Genome Graph
 - historical scientist / scholarly-data ingestion pipelines
-- Science Genome -> OSIRIS World bridge
+- Science Genome -> ORBYTHRA World bridge
+- ORBYTHRA Engineering Intelligence
 - specialist Hunter modules
 - SEAL authorization/provenance receipts
+
+Engineering Intelligence adds a first-principles, multi-scale technical decision surface with explicit alternatives, FMEA, unknown/assumption separation and quantitative verification planning. Model output is not represented as a physical test, certification or licensed-engineering approval.
 
 The commercial goal is to make the asset defensible to a strategic buyer through product maturity, demonstrable data integrations, rights clarity, security evidence, deployment evidence and customer/pilot proof.
 
@@ -29,14 +32,14 @@ The parent repository is a fork and its root license is MIT with copyright attri
 
 This means:
 
-- OSIRIS can contain and distribute MIT-licensed upstream material.
+- ORBYTHRA can contain and distribute MIT-licensed upstream material.
 - A buyer must receive the applicable upstream MIT notice.
 - Upstream MIT code is not exclusive proprietary IP.
-- Value must be attributed to OSIRIS-specific code, architecture, integrations, brand, data pipelines, deployment, customer relationships and any separately owned IP.
+- Value must be attributed to ORBYTHRA-specific code, architecture, integrations, brand, data pipelines, decision workflows, deployment, customer relationships and any separately owned IP.
 
 ### Carve-out status
 
-The Asset Readiness workflow now produces an OSIRIS-only carve-out ZIP, file hashes, Git path provenance, dependency SBOM, data-rights registry and upstream MIT notice. This materially improves technical due diligence, but it is not a legal certification of exclusive ownership.
+The Asset Readiness workflow produces an ORBYTHRA-branded carve-out ZIP, file hashes, Git path provenance, dependency SBOM, data-rights registry and upstream MIT notice. The repository path `osiris_ai_fusion` may remain as a legacy implementation path for compatibility; it is not the acquisition-facing product name. This materially improves technical due diligence, but it is not a legal certification of exclusive ownership.
 
 Before a final asset sale, a buyer/counsel should still confirm:
 
@@ -100,7 +103,10 @@ Do not market the upstream open-source repository itself as exclusive property.
 - [x] Temporal Globe UI
 - [x] Science Genome Graph schema and live adapters
 - [x] Science Genome Explorer UI
-- [x] Science Genome -> OSIRIS World evidence bridge
+- [x] Science Genome -> ORBYTHRA World evidence bridge
+- [x] Engineering Intelligence v2.0 API + Engineering Lab UI
+- [x] canonical engineering prompt retained and versioned
+- [x] engineering structural quality gate + bounded repair pass
 - [x] hardened production Compose baseline
 - [ ] production domain with uptime history
 - [ ] buyer-safe public demo tenant
@@ -113,14 +119,15 @@ Do not market the upstream open-source repository itself as exclusive property.
 - [x] hardened Docker build
 - [x] non-root runtime check
 - [x] DCO checks
-- [x] regression tests for tenant isolation/world/forks/atlas/science graph
+- [x] regression tests for tenant isolation/world/forks/atlas/science/engineering
 - [x] SBOM artifact on every asset-readiness run
 - [x] buyer file-hash/data-rights manifest
-- [x] automated OSIRIS-only carve-out bundle
+- [x] automated ORBYTHRA carve-out bundle
 - [x] integrity-checked backup + restore tooling and regression tests
 - [x] reproducible synthetic core benchmark in buyer data-room artifact
 - [ ] signed release artifacts/provenance attestations
 - [ ] production load/latency benchmark and SLO/error-budget dashboard
+- [ ] external validation benchmark for Engineering Intelligence against real engineering cases
 
 ### Security
 
@@ -134,6 +141,7 @@ Do not market the upstream open-source repository itself as exclusive property.
 - [x] threat model / STRIDE-style register
 - [x] deterministic credential leakage scan in security CI
 - [x] read-only/no-new-privileges/cap-drop Compose validation
+- [x] engineering mode forbids fabricated measurements/certifications and marks high-risk approval boundary
 - [ ] third-party penetration test
 - [ ] formal secrets rotation exercise evidence
 - [ ] incident response tabletop evidence
@@ -144,16 +152,16 @@ Do not market the upstream open-source repository itself as exclusive property.
 - [x] upstream MIT license identified
 - [x] science/data source commercial classifications documented
 - [x] provenance/source IDs retained in science graph
-- [x] automated OSIRIS-only carve-out bundle
-- [x] file hash inventory + OSIRIS path Git provenance artifact
+- [x] automated ORBYTHRA carve-out bundle
+- [x] file hash inventory + legacy source-path Git provenance artifact
 - [x] automated dependency/license SBOM
 - [x] third-party notices document
-- [ ] standalone OSIRIS repository if required by transaction structure
+- [ ] standalone ORBYTHRA repository if required by transaction structure
 - [ ] trademark/domain ownership package
 - [ ] contributor assignment register
 - [ ] counsel review of final asset-purchase IP schedule
 
-### Data moat
+### Data / decision moat
 
 - [x] source-independent world/reality schema
 - [x] historical/present/future temporal semantics in Temporal Reality Atlas
@@ -165,10 +173,12 @@ Do not market the upstream open-source repository itself as exclusive property.
 - [x] normalized NCBI/Ensembl/UniProt release JSONL import paths
 - [x] Science Graph relationship derivation
 - [x] digest-deduplicated Science -> World bridge
+- [x] multi-layer engineering decision protocol integrated as a product capability
 - [ ] cross-source scientist identity resolution benchmark
 - [ ] cross-database gene/protein/variant resolution benchmark
 - [ ] large production-scale source snapshots actually ingested and measured
 - [ ] proprietary derived signals that do not violate source licenses
+- [ ] proprietary engineering benchmark/case corpus with rights clearance
 
 ### Commercial proof
 
@@ -185,19 +195,19 @@ A seven-figure asking price becomes materially easier to defend when several of 
 
 1. Standalone IP provenance is clean and buyer-auditable.
 2. Production deployment has uptime/security evidence.
-3. The live demo visibly combines World + Temporal Globe + Science Genome Graph.
+3. The live demo visibly combines World + Temporal Globe + Science Genome Graph + Engineering Intelligence.
 4. At least one large-scale source importer is operational, resumable and populated with a material real dataset.
 5. A unique derived-data/decision layer exists beyond simply proxying public APIs.
 6. Enterprise design partners or paid pilots validate willingness to pay.
-7. Benchmarks show measurable advantage over a conventional search/RAG stack.
+7. Benchmarks show measurable advantage over a conventional search/RAG stack and, for engineering use, over an unstructured general-model baseline.
 8. Data licensing and attribution obligations are automated, not manual.
 9. A buyer can reproduce the product from a clean checkout with documented secrets/config.
 10. Security/privacy review has no unresolved critical findings.
 
-The repository now covers a substantial part of gates 3, 4 (software path), 8 and 9. Gates 1, 2, 5, 6, 7 and 10 still require external/production evidence rather than more source files alone.
+The repository covers a substantial part of gates 3, 4 (software path), 8 and 9. Gates 1, 2, 5, 6, 7 and 10 still require external/production evidence rather than more source files alone.
 
 ## Marketplace versus strategic sale
 
 A generic marketplace typically values pre-revenue software primarily as a small code/domain asset. The path to a seven-figure outcome is therefore not "add more files"; it is to create strategic scarcity through integrated technology, clean IP, operational proof, proprietary derived intelligence and customer validation.
 
-OSIRIS should be sold, if sold, as a coherent platform/IP/data-infrastructure acquisition rather than a template SaaS listing.
+ORBYTHRA should be sold, if sold, as a coherent platform/IP/data/decision-infrastructure acquisition rather than a template SaaS listing.
