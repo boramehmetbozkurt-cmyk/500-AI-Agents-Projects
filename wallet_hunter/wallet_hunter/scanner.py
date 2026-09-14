@@ -6,7 +6,14 @@ import httpx
 
 from .config import CHAINS, settings
 from .models import ChainResult, NativeBalance, Opportunity, WalletReport, WalletScanRequest
-from .providers import DexScreenerProvider, EtherscanV2Provider, GoPlusProvider, ManifestOpportunityProvider, RpcClient
+from .providers import (
+    DexScreenerProvider,
+    EtherscanV2Provider,
+    GoPlusProvider,
+    ManifestOpportunityProvider,
+    OfficialEligibilityProvider,
+    RpcClient,
+)
 
 
 SEVERITY_PENALTY = {
@@ -28,10 +35,14 @@ class WalletScanner:
             results = await asyncio.gather(
                 *(self._scan_chain(client, chain, request.address) for chain in chains)
             )
+            manifest = ManifestOpportunityProvider().load()
+            scoped = self._scope_opportunities(manifest, chains, request.address)
+            checker = OfficialEligibilityProvider(client)
+            checked = await asyncio.gather(
+                *(checker.check(opportunity, request.address) for opportunity in scoped)
+            )
 
-        manifest = ManifestOpportunityProvider().load()
-        scoped = self._scope_opportunities(manifest, chains, request.address)
-        opportunities = self._rank_opportunities(scoped, results)
+        opportunities = self._rank_opportunities(checked, results)
         warnings: list[str] = []
         if unknown:
             warnings.append(f"Unsupported chains ignored: {', '.join(unknown)}")
@@ -40,7 +51,7 @@ class WalletScanner:
                 "ETHERSCAN_API_KEY is not configured; ERC-20 discovery is limited to native balances."
             )
         warnings.append(
-            "Wallet Hunter never signs or broadcasts transactions. Claimable status must be confirmed by an official eligibility source for the scanned address."
+            "Wallet Hunter never signs or broadcasts transactions. Claimable status is confirmed only when a trusted official wallet-specific eligibility source positively confirms the scanned address."
         )
         return WalletReport(
             address=request.address,
@@ -115,9 +126,12 @@ class WalletScanner:
             if opportunity.chain not in selected:
                 continue
             item = opportunity.model_copy(deep=True)
-            if item.status == "confirmed" and item.eligibility_address != normalized_address:
+            source = item.eligibility_source
+            trusted_source = source is not None and source.trusted
+            wallet_bound = item.eligibility_address == normalized_address
+            if item.status == "confirmed" and not (trusted_source and wallet_bound):
                 item.status = "candidate"
-                reason = "Confirmation is not bound to the scanned wallet address"
+                reason = "Static confirmation is insufficient; trusted official wallet verification is required"
                 if reason not in item.risk_reasons:
                     item.risk_reasons.append(reason)
             scoped.append(item)
