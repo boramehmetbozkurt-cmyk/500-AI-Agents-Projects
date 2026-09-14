@@ -32,6 +32,7 @@ from rate_limit import InMemoryRateLimiter
 from reality_atlas import router as reality_atlas_router
 from saas import AuthContext, require_identity, router as saas_router, saas_manager
 from schemas import CaseCreate, InvestigationRequestModel, WatchlistCreate
+from science_world import router as science_world_router
 from seal import verify_receipt
 from sensor_mesh import ingest_investigation_result, router as sensor_mesh_router
 from source_policy import policy_report
@@ -65,7 +66,8 @@ app = FastAPI(
     version="1.3.0",
     description=(
         "Multi-tenant public SaaS for evidence-first, authorization-aware AI research "
-        "with provider federation, a verified living world model and BCE-to-future reality atlas."
+        "with provider federation, a verified living world model, BCE-to-future reality atlas "
+        "and an evidence-bound science/genome graph."
     ),
     lifespan=lifespan,
 )
@@ -91,13 +93,14 @@ if settings.saas_enabled:
 app.include_router(world_router)
 app.include_router(reality_atlas_router)
 app.include_router(sensor_mesh_router)
+app.include_router(science_world_router)
 
 
 @app.middleware("http")
 async def request_context(request: Request, call_next):
     request_id = request.headers.get("X-Request-ID") or secrets.token_hex(12)
     started = time.monotonic()
-    if request.url.path.startswith(("/investigate", "/world")):
+    if request.url.path.startswith(("/investigate", "/world", "/science")):
         raw_identity = (
             request.headers.get("X-API-Key")
             or request.headers.get("Authorization")
@@ -155,6 +158,8 @@ async def health() -> dict[str, Any]:
         "world": True,
         "temporal_reality_atlas": True,
         "sensor_mesh": True,
+        "science_genome_graph": True,
+        "temporal_globe": True,
     }
 
 
@@ -460,8 +465,28 @@ if settings.saas_enabled and settings.saas_ui_dir.exists():
             raise HTTPException(status_code=404, detail="Command center UI disabled")
         return FileResponse(settings.ui_dir / "index.html")
 
+    @app.get("/atlas", include_in_schema=False)
+    async def fusion_atlas_ui():
+        if not settings.ui_enabled or not settings.ui_dir.exists():
+            raise HTTPException(status_code=404, detail="Fusion Atlas UI disabled")
+        return FileResponse(settings.ui_dir / "assets" / "atlas.html")
+
+    @app.get("/world-globe", include_in_schema=False)
+    async def temporal_globe_ui():
+        if not settings.ui_enabled or not settings.ui_dir.exists():
+            raise HTTPException(status_code=404, detail="Temporal Globe UI disabled")
+        return FileResponse(settings.ui_dir / "assets" / "temporal-globe.html")
+
 elif settings.ui_enabled and settings.ui_dir.exists():
 
     @app.get("/", include_in_schema=False)
     async def ui_index():
         return FileResponse(settings.ui_dir / "index.html")
+
+    @app.get("/atlas", include_in_schema=False)
+    async def fusion_atlas_ui():
+        return FileResponse(settings.ui_dir / "assets" / "atlas.html")
+
+    @app.get("/world-globe", include_in_schema=False)
+    async def temporal_globe_ui():
+        return FileResponse(settings.ui_dir / "assets" / "temporal-globe.html")
