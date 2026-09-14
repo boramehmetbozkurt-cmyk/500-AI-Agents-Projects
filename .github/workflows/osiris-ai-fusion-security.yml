@@ -1,4 +1,4 @@
-name: OSIRIS AI Fusion Security
+name: ORBYTHRA Security
 
 on:
   pull_request:
@@ -42,9 +42,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Build hardened container
-        run: docker build --pull -t osiris-ai-fusion:ci osiris_ai_fusion
+        run: docker build --pull -t orbythra:ci osiris_ai_fusion
       - name: Inspect non-root runtime user
-        run: docker run --rm --entrypoint sh osiris-ai-fusion:ci -c 'test "$(id -u)" = "10001"'
+        run: docker run --rm --entrypoint sh orbythra:ci -c 'test "$(id -u)" = "10001"'
       - name: Validate production Compose security baseline
         working-directory: osiris_ai_fusion
         run: |
@@ -54,8 +54,8 @@ jobs:
           REQUIRE_SIGNED_RECEIPTS=false
           WATCHER_ENABLED=false
           EOF
-          docker compose -f docker-compose.production.yml config > /tmp/osiris-compose.yml
-          grep -q 'read_only: true' /tmp/osiris-compose.yml
-          grep -q 'no-new-privileges:true' /tmp/osiris-compose.yml
-          grep -q 'cap_drop:' /tmp/osiris-compose.yml
+          docker compose -f docker-compose.production.yml config > /tmp/orbythra-compose.yml
+          grep -q 'read_only: true' /tmp/orbythra-compose.yml
+          grep -q 'no-new-privileges:true' /tmp/orbythra-compose.yml
+          grep -q 'cap_drop:' /tmp/orbythra-compose.yml
           rm -f .env.production
