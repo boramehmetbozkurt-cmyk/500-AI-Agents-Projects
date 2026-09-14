@@ -60,45 +60,76 @@ class EtherscanV2Provider:
     async def discover_tokens(self, chain: str, address: str) -> list[TokenPosition]:
         if not settings.etherscan_api_key:
             return []
-        spec = CHAINS[chain]
-        params = {
-            "chainid": str(spec.chain_id),
-            "module": "account",
-            "action": "tokentx",
-            "address": address,
-            "page": "1",
-            "offset": str(settings.wallet_hunter_max_tokens),
-            "sort": "desc",
-            "apikey": settings.etherscan_api_key,
-        }
-        response = await self.client.get(self.endpoint, params=params)
-        response.raise_for_status()
-        payload = response.json()
-        rows = payload.get("result") if isinstance(payload, dict) else []
-        if not isinstance(rows, list):
-            return []
 
+        spec = CHAINS[chain]
+        max_tokens = max(1, settings.wallet_hunter_max_tokens)
+        page_size = min(100, max_tokens)
         discovered: dict[str, TokenPosition] = {}
-        for row in rows:
-            contract = str(row.get("contractAddress", "")).lower()
-            if not contract.startswith("0x") or len(contract) != 42:
-                continue
-            try:
-                decimals = int(row.get("tokenDecimal") or 18)
-            except (TypeError, ValueError):
-                decimals = 18
-            discovered.setdefault(
-                contract,
-                TokenPosition(
-                    chain=chain,
-                    contract=contract,
-                    symbol=row.get("tokenSymbol") or None,
-                    name=row.get("tokenName") or None,
-                    decimals=decimals,
-                    source=["etherscan-v2:tokentx"],
-                ),
-            )
-        return list(discovered.values())[: settings.wallet_hunter_max_tokens]
+        page = 1
+
+        while len(discovered) < max_tokens and page <= 100:
+            params = {
+                "chainid": str(spec.chain_id),
+                "module": "account",
+                "action": "tokentx",
+                "address": address,
+                "page": str(page),
+                "offset": str(page_size),
+                "sort": "desc",
+                "apikey": settings.etherscan_api_key,
+            }
+            response = await self.client.get(self.endpoint, params=params)
+            response.raise_for_status()
+            payload = response.json()
+            if not isinstance(payload, dict):
+                raise RuntimeError("Etherscan returned a non-object response")
+
+            rows = payload.get("result")
+            status = str(payload.get("status", ""))
+            message = str(payload.get("message", ""))
+
+            if status == "0":
+                no_rows = isinstance(rows, list) and not rows
+                no_transactions = isinstance(rows, str) and "no transactions found" in rows.lower()
+                if no_rows or no_transactions:
+                    break
+                detail = rows if isinstance(rows, str) else message
+                raise RuntimeError(f"Etherscan API failure: {message or detail}")
+
+            if status not in {"", "1"}:
+                raise RuntimeError(f"Etherscan API failure: {message or status}")
+            if not isinstance(rows, list):
+                raise RuntimeError(
+                    f"Etherscan API failure: {message or 'result is not a transaction list'}"
+                )
+
+            for row in rows:
+                contract = str(row.get("contractAddress", "")).lower()
+                if not contract.startswith("0x") or len(contract) != 42:
+                    continue
+                try:
+                    decimals = int(row.get("tokenDecimal") or 18)
+                except (TypeError, ValueError):
+                    decimals = 18
+                discovered.setdefault(
+                    contract,
+                    TokenPosition(
+                        chain=chain,
+                        contract=contract,
+                        symbol=row.get("tokenSymbol") or None,
+                        name=row.get("tokenName") or None,
+                        decimals=decimals,
+                        source=["etherscan-v2:tokentx"],
+                    ),
+                )
+                if len(discovered) >= max_tokens:
+                    break
+
+            if len(rows) < page_size:
+                break
+            page += 1
+
+        return list(discovered.values())[:max_tokens]
 
 
 class DexScreenerProvider:
@@ -113,10 +144,19 @@ class DexScreenerProvider:
             response.raise_for_status()
             pairs = response.json().get("pairs") or []
             chain_id = CHAINS[token.chain].dexscreener_chain
-            pairs = [p for p in pairs if p.get("chainId") == chain_id]
+            contract = token.contract.lower()
+            pairs = [
+                pair
+                for pair in pairs
+                if pair.get("chainId") == chain_id
+                and str((pair.get("baseToken") or {}).get("address", "")).lower() == contract
+            ]
             if not pairs:
                 return token
-            best = max(pairs, key=lambda p: float((p.get("liquidity") or {}).get("usd") or 0))
+            best = max(
+                pairs,
+                key=lambda pair: float((pair.get("liquidity") or {}).get("usd") or 0),
+            )
             token.price_usd = float(best.get("priceUsd")) if best.get("priceUsd") else None
             token.liquidity_usd = float((best.get("liquidity") or {}).get("usd") or 0)
             if token.balance is not None and token.price_usd is not None:
