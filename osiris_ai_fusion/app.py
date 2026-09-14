@@ -32,6 +32,7 @@ from rate_limit import InMemoryRateLimiter
 from reality_atlas import router as reality_atlas_router
 from saas import AuthContext, require_identity, router as saas_router, saas_manager
 from schemas import CaseCreate, InvestigationRequestModel, WatchlistCreate
+from science_edges import router as science_graph_router
 from science_world import router as science_world_router
 from seal import verify_receipt
 from sensor_mesh import ingest_investigation_result, router as sensor_mesh_router
@@ -67,7 +68,7 @@ app = FastAPI(
     description=(
         "Multi-tenant public SaaS for evidence-first, authorization-aware AI research "
         "with provider federation, a verified living world model, BCE-to-future reality atlas "
-        "and an evidence-bound science/genome graph."
+        "and an evidence-bound science/genome knowledge graph."
     ),
     lifespan=lifespan,
 )
@@ -94,6 +95,7 @@ app.include_router(world_router)
 app.include_router(reality_atlas_router)
 app.include_router(sensor_mesh_router)
 app.include_router(science_world_router)
+app.include_router(science_graph_router)
 
 
 @app.middleware("http")
@@ -159,6 +161,7 @@ async def health() -> dict[str, Any]:
         "temporal_reality_atlas": True,
         "sensor_mesh": True,
         "science_genome_graph": True,
+        "science_relationship_graph": True,
         "temporal_globe": True,
     }
 
@@ -477,6 +480,12 @@ if settings.saas_enabled and settings.saas_ui_dir.exists():
             raise HTTPException(status_code=404, detail="Temporal Globe UI disabled")
         return FileResponse(settings.ui_dir / "assets" / "temporal-globe.html")
 
+    @app.get("/science-explorer", include_in_schema=False)
+    async def science_explorer_ui():
+        if not settings.ui_enabled or not settings.ui_dir.exists():
+            raise HTTPException(status_code=404, detail="Science Genome Explorer UI disabled")
+        return FileResponse(settings.ui_dir / "assets" / "science-explorer.html")
+
 elif settings.ui_enabled and settings.ui_dir.exists():
 
     @app.get("/", include_in_schema=False)
@@ -490,3 +499,7 @@ elif settings.ui_enabled and settings.ui_dir.exists():
     @app.get("/world-globe", include_in_schema=False)
     async def temporal_globe_ui():
         return FileResponse(settings.ui_dir / "assets" / "temporal-globe.html")
+
+    @app.get("/science-explorer", include_in_schema=False)
+    async def science_explorer_ui():
+        return FileResponse(settings.ui_dir / "assets" / "science-explorer.html")
