@@ -4,7 +4,7 @@ Standalone, read-only EVM wallet intelligence service for finding and ranking **
 
 ## What it does
 
-`wallet address -> multichain scan -> token discovery -> USD/liquidity enrichment -> token security checks -> opportunity matching -> net-value/risk ranking -> optional read-only transaction simulation`
+`wallet address -> multichain scan -> token discovery -> USD/liquidity enrichment -> token security checks -> official wallet eligibility verification -> net-value/risk ranking -> optional read-only transaction simulation`
 
 Supported EVM networks in v0.1:
 
@@ -24,9 +24,24 @@ Wallet Hunter is **read-only by default**. It does not store private keys, seed 
 - Etherscan API v2: ERC-20 transfer history / token discovery when an API key is configured
 - DexScreener: best-effort price and liquidity enrichment
 - GoPlus: best-effort token-security signals
-- Curated opportunity manifests: official claim/quest metadata and explicit eligibility status
+- Curated opportunity manifests: official claim/quest metadata
+- Official Eligibility Engine: operator-reviewed, wallet-specific, read-only HTTPS eligibility endpoints
 
-No adapter is treated as ground truth by itself. A claim is labelled `confirmed` only when an official/allowlisted eligibility source confirms it. Otherwise the result is `candidate` or `unknown`.
+No adapter is treated as ground truth by itself. A claim is labelled `confirmed` only after a configured eligibility endpoint is both marked `trusted` by the operator and positively confirms the **exact scanned wallet address**. Static manifest text cannot create a confirmed claim. Provider timeout, HTTP failure, malformed JSON or an unrecognized response fails closed to `unknown`; an explicit negative result becomes `rejected`.
+
+### Official eligibility source schema
+
+Each manifest opportunity can define an `eligibility_source` with:
+
+- an absolute public `https://` URL;
+- GET-only verification;
+- the query parameter that receives the scanned wallet address;
+- fixed campaign query parameters;
+- a JSON result path and accepted positive values;
+- an optional reward-value path;
+- `trusted: true` only after an operator verifies the endpoint belongs to the official campaign and really returns wallet-specific eligibility.
+
+The model rejects localhost/private-IP endpoint literals. HTTP redirects remain disabled by the scanner client. `opportunities.example.json` intentionally leaves its placeholder endpoint `trusted: false`; it is not a real claim source.
 
 ## Quick start
 
@@ -54,6 +69,8 @@ Every opportunity includes:
 - chain
 - asset / reward symbol when known
 - status: `confirmed`, `candidate`, `unknown`, or `rejected`
+- exact wallet binding for confirmed eligibility
+- official eligibility evidence when confirmation succeeds
 - estimated USD value when verifiable
 - estimated gas cost when available
 - net estimated value
