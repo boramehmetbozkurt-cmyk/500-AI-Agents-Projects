@@ -24,6 +24,7 @@ from capabilities import (
 from config import get_settings
 from engineering_intelligence import router as engineering_router
 from graph import investigate, investigate_stream
+from intelligence import router as intelligence_router
 from llm import ModelRouter
 from metrics import metrics
 from osiris_client import FORBIDDEN_ACTIVE_PATHS, READ_ONLY_TOOLS, OsirisClient, tool_catalog
@@ -42,7 +43,7 @@ from store import FusionStore
 from watcher import run_watcher
 from world import router as world_router
 
-logger = logging.getLogger("osiris_fusion")
+logger = logging.getLogger("orbythra")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 settings = get_settings()
 rate_limiter = InMemoryRateLimiter(settings.request_limit_per_minute)
@@ -69,7 +70,8 @@ app = FastAPI(
     description=(
         "Multi-tenant public SaaS for evidence-first, authorization-aware AI research "
         "with provider federation, a verified living world model, BCE-to-future reality atlas, "
-        "an evidence-bound science/genome knowledge graph, and multi-layer engineering decision intelligence."
+        "an evidence-bound science/genome knowledge graph, multi-layer engineering decision intelligence, "
+        "and transparent proprietary world-intelligence signals."
     ),
     lifespan=lifespan,
 )
@@ -93,6 +95,7 @@ if settings.saas_enabled:
     app.include_router(saas_router)
 
 app.include_router(world_router)
+app.include_router(intelligence_router)
 app.include_router(engineering_router)
 app.include_router(reality_atlas_router)
 app.include_router(sensor_mesh_router)
@@ -104,7 +107,9 @@ app.include_router(science_graph_router)
 async def request_context(request: Request, call_next):
     request_id = request.headers.get("X-Request-ID") or secrets.token_hex(12)
     started = time.monotonic()
-    if request.url.path.startswith(("/investigate", "/world", "/science", "/engineering")):
+    if request.url.path.startswith(
+        ("/investigate", "/world", "/science", "/engineering", "/intelligence")
+    ):
         raw_identity = (
             request.headers.get("X-API-Key")
             or request.headers.get("Authorization")
@@ -122,7 +127,10 @@ async def request_context(request: Request, call_next):
     try:
         response = await call_next(request)
     except Exception:
+        elapsed_ms = round((time.monotonic() - started) * 1000, 1)
         metrics.inc("unhandled_errors")
+        metrics.inc("http_500")
+        metrics.observe("http_latency_ms", elapsed_ms)
         logger.exception("unhandled_request_error request_id=%s", request_id)
         return JSONResponse(
             status_code=500,
@@ -141,6 +149,7 @@ async def request_context(request: Request, call_next):
     )
     elapsed_ms = round((time.monotonic() - started) * 1000, 1)
     metrics.inc(f"http_{response.status_code}")
+    metrics.observe("http_latency_ms", elapsed_ms)
     logger.info(
         "request_complete request_id=%s method=%s path=%s status=%s elapsed_ms=%s",
         request_id,
@@ -160,6 +169,7 @@ async def health() -> dict[str, Any]:
         "version": app.version,
         "saas": settings.saas_enabled,
         "world": True,
+        "proprietary_world_intelligence": True,
         "temporal_reality_atlas": True,
         "sensor_mesh": True,
         "science_genome_graph": True,
@@ -181,10 +191,10 @@ async def ready(_: AuthContext = Depends(require_identity)) -> dict[str, Any]:
     }
     try:
         async with OsirisClient() as client:
-            result["dependencies"]["osiris"] = await client.health()
+            result["dependencies"]["orbythra_core"] = await client.health()
     except Exception as exc:
         result["status"] = "degraded"
-        result["dependencies"]["osiris"] = {
+        result["dependencies"]["orbythra_core"] = {
             "status": "unreachable",
             "error_type": type(exc).__name__,
         }
@@ -199,10 +209,15 @@ async def ready(_: AuthContext = Depends(require_identity)) -> dict[str, Any]:
     return result
 
 
-@app.get("/osiris-contract")
-async def osiris_contract(_: AuthContext = Depends(require_identity)) -> dict[str, Any]:
+@app.get("/orbythra-contract")
+async def orbythra_contract(_: AuthContext = Depends(require_identity)) -> dict[str, Any]:
     async with OsirisClient() as client:
         return await client.passive_contract_probe()
+
+
+@app.get("/osiris-contract", include_in_schema=False)
+async def legacy_osiris_contract(_: AuthContext = Depends(require_identity)) -> dict[str, Any]:
+    return await orbythra_contract(_)
 
 
 @app.get("/tools")
@@ -450,6 +465,13 @@ async def prometheus_metrics(auth: AuthContext = Depends(require_identity)) -> s
     if not auth.is_admin:
         raise HTTPException(status_code=403, detail="Administrator access required")
     return metrics.render_prometheus()
+
+
+@app.get("/slo")
+async def slo_report(auth: AuthContext = Depends(require_identity)) -> dict[str, Any]:
+    if not auth.is_admin:
+        raise HTTPException(status_code=403, detail="Administrator access required")
+    return metrics.slo_report()
 
 
 if settings.ui_enabled and settings.ui_dir.exists():
