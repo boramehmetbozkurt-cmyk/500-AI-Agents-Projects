@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: osiris-fusion
+    name: orbythra
     runtime: docker
     branch: osiris-fusion-v1-release
     rootDir: osiris_ai_fusion
@@ -22,10 +22,10 @@ services:
       - key: WATCHER_ENABLED
         value: "false"
       - key: FUSION_STORE_PATH
-        value: /var/lib/osiris-fusion/fusion.sqlite3
+        value: /var/lib/orbythra/fusion.sqlite3
       - key: SEAL_REPLAY_DB
-        value: /var/lib/osiris-fusion/seal-replay.sqlite3
-      - key: OSIRIS_FUSION_API_KEY
+        value: /var/lib/orbythra/seal-replay.sqlite3
+      - key: ORBYTHRA_FUSION_API_KEY
         generateValue: true
       - key: SEAL_ED25519_PRIVATE_KEY_B64
         sync: false
@@ -38,6 +38,6 @@ services:
       - key: LLM_FALLBACK_MODEL
         sync: false
     disk:
-      name: osiris-fusion-data
-      mountPath: /var/lib/osiris-fusion
+      name: orbythra-data
+      mountPath: /var/lib/orbythra
       sizeGB: 1
