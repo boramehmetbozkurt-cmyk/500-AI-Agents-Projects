@@ -5,7 +5,6 @@ import json
 import sqlite3
 import threading
 import time
-import uuid
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Annotated, Any, Literal
@@ -460,17 +459,30 @@ class RealityAtlasStore:
             end_key = feature.temporal.start.end_key() if feature.temporal.start else None
         now = int(time.time())
         values = (
-            feature_id, workspace_id, feature.branch_id, feature.name, feature.feature_type,
-            feature.realm, feature.truth_mode, feature.confidence,
-            _json(feature.temporal.model_dump(mode="json")), start_key, end_key,
+            feature_id,
+            workspace_id,
+            feature.branch_id,
+            feature.name,
+            feature.feature_type,
+            feature.realm,
+            feature.truth_mode,
+            feature.confidence,
+            _json(feature.temporal.model_dump(mode="json")),
+            start_key,
+            end_key,
             _json(feature.space.model_dump(mode="json")),
             _json(feature.geometry) if feature.geometry is not None else None,
             _json(feature.local_position) if feature.local_position is not None else None,
-            bbox[0] if bbox else None, bbox[1] if bbox else None,
-            bbox[2] if bbox else None, bbox[3] if bbox else None,
+            bbox[0] if bbox else None,
+            bbox[1] if bbox else None,
+            bbox[2] if bbox else None,
+            bbox[3] if bbox else None,
             _json([item.model_dump(mode="json") for item in feature.assets]),
             _json([item.model_dump(mode="json") for item in feature.portals]),
-            _json(feature.evidence_ids), _json(feature.source_ids), _json(feature.metadata), now,
+            _json(feature.evidence_ids),
+            _json(feature.source_ids),
+            _json(feature.metadata),
+            now,
         )
         with self._lock, self._connect() as conn:
             conn.execute(
@@ -509,7 +521,9 @@ class RealityAtlasStore:
         item["space"] = json.loads(item.pop("space_json"))
         item["geometry"] = json.loads(item["geometry_json"]) if item.get("geometry_json") else None
         item.pop("geometry_json", None)
-        item["local_position"] = json.loads(item["local_position_json"]) if item.get("local_position_json") else None
+        item["local_position"] = (
+            json.loads(item["local_position_json"]) if item.get("local_position_json") else None
+        )
         item.pop("local_position_json", None)
         for key in ("assets", "portals", "evidence_ids", "source_ids", "metadata"):
             item[key] = json.loads(item.pop(f"{key}_json"))
@@ -550,9 +564,10 @@ class RealityAtlasStore:
         if year is not None:
             if year == 0:
                 raise ValueError("year 0 is invalid")
-            point = year * 10_000 + 101
+            year_start = year * 10_000 + 101
+            year_end = year * 10_000 + 1231
             sql += " AND (start_key IS NULL OR start_key<=?) AND (end_key IS NULL OR end_key>=?)"
-            params.extend([point, point])
+            params.extend([year_end, year_start])
         if realm:
             sql += " AND realm=?"
             params.append(realm)
@@ -583,12 +598,24 @@ class RealityAtlasStore:
             "features": [self._decode(row) for row in rows],
         }
 
-    def portals(self, workspace_id: str, *, branch_id: str = REALITY_BRANCH, limit: int = 500) -> list[dict[str, Any]]:
+    def portals(
+        self,
+        workspace_id: str,
+        *,
+        branch_id: str = REALITY_BRANCH,
+        limit: int = 500,
+    ) -> list[dict[str, Any]]:
         result = self.query(workspace_id, branch_id=branch_id, limit=limit)
         links: list[dict[str, Any]] = []
         for feature in result["features"]:
             for portal in feature["portals"]:
-                links.append({"source_feature_id": feature["id"], "source_space_id": feature["space"]["space_id"], **portal})
+                links.append(
+                    {
+                        "source_feature_id": feature["id"],
+                        "source_space_id": feature["space"]["space_id"],
+                        **portal,
+                    }
+                )
         return links
 
     def timeline(self, workspace_id: str, *, branch_id: str = REALITY_BRANCH) -> dict[str, Any]:
@@ -604,7 +631,11 @@ class RealityAtlasStore:
                 start = temporal.get("start")
                 end = temporal.get("end")
                 feature_start = int(start["year"]) if start else -2_000_000
-                feature_end = int(end["year"]) if end else (2_000_000 if temporal.get("open_ended") else feature_start)
+                feature_end = (
+                    int(end["year"])
+                    if end
+                    else (2_000_000 if temporal.get("open_ended") else feature_start)
+                )
                 if feature_end < start_year or feature_start > end_year:
                     continue
                 count += 1
@@ -625,7 +656,14 @@ async def atlas_info(auth: Identity) -> dict[str, Any]:
         "name": "OSIRIS Temporal Reality Atlas",
         "workspace_id": auth.tenant_id,
         "temporal_range": {"min_year": -2_000_000, "max_year": 2_000_000, "year_zero": False},
-        "realms": ["physical", "historical_reconstruction", "digital_twin", "mixed_reality", "metaverse", "simulation"],
+        "realms": [
+            "physical",
+            "historical_reconstruction",
+            "digital_twin",
+            "mixed_reality",
+            "metaverse",
+            "simulation",
+        ],
         "principles": [
             "bce_to_future_temporal_index",
             "physical_and_virtual_coordinate_spaces",
@@ -689,9 +727,15 @@ async def query_atlas_features(
     limit: int = Query(default=500, ge=1, le=5000),
 ) -> dict[str, Any]:
     bbox_values = (min_lon, min_lat, max_lon, max_lat)
-    if any(item is not None for item in bbox_values) and not all(item is not None for item in bbox_values):
+    if any(item is not None for item in bbox_values) and not all(
+        item is not None for item in bbox_values
+    ):
         raise HTTPException(status_code=400, detail="bbox requires min_lon,min_lat,max_lon,max_lat")
-    bbox = tuple(float(item) for item in bbox_values) if all(item is not None for item in bbox_values) else None
+    bbox = (
+        tuple(float(item) for item in bbox_values)
+        if all(item is not None for item in bbox_values)
+        else None
+    )
     try:
         return atlas_store.query(
             auth.tenant_id,
@@ -710,7 +754,10 @@ async def query_atlas_features(
 
 
 @router.get("/timeline")
-async def atlas_timeline(auth: Identity, branch_id: str = Query(default=REALITY_BRANCH, max_length=100)) -> dict[str, Any]:
+async def atlas_timeline(
+    auth: Identity,
+    branch_id: str = Query(default=REALITY_BRANCH, max_length=100),
+) -> dict[str, Any]:
     try:
         return atlas_store.timeline(auth.tenant_id, branch_id=branch_id)
     except KeyError as exc:
