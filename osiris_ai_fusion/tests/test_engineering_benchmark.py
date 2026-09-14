@@ -22,7 +22,7 @@ ATEŞ: surface emissivity ve sıcaklık sınırını kontrol et.
 HAVA: doğal convection yolunu hesapla.
 FMEA
 Aşırı sıcaklık ve contact area belirsizliği arıza modudur.
-DOĞRULAMA
+DOĞRULAMA / verification
 Termal test ve model korelasyonu yap.
 9. BİLİNMEYENLER
 Enclosure dimensions, material, surface emissivity, component contact area.
