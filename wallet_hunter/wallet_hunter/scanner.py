@@ -152,6 +152,19 @@ class WalletScanner:
                 )
 
         for opportunity in opportunities:
+            source = opportunity.eligibility_source
+            trusted_confirmation = (
+                opportunity.status == "confirmed"
+                and source is not None
+                and source.trusted
+                and opportunity.eligibility_address is not None
+            )
+            if opportunity.status == "confirmed" and not trusted_confirmation:
+                opportunity.status = "candidate"
+                reason = "Confirmed status failed the trusted official-source invariant"
+                if reason not in opportunity.risk_reasons:
+                    opportunity.risk_reasons.append(reason)
+
             if opportunity.reward_contract:
                 token_risk = risk_by_contract.get(
                     (opportunity.chain, opportunity.reward_contract.lower()),
@@ -161,7 +174,9 @@ class WalletScanner:
             if opportunity.estimated_value_usd is not None and opportunity.estimated_gas_usd is not None:
                 opportunity.net_value_usd = opportunity.estimated_value_usd - opportunity.estimated_gas_usd
             if opportunity.status != "confirmed":
-                opportunity.risk_reasons.append("Eligibility is not confirmed by an official source for this wallet")
+                reason = "Eligibility is not confirmed by an official source for this wallet"
+                if reason not in opportunity.risk_reasons:
+                    opportunity.risk_reasons.append(reason)
                 opportunity.risk_score = max(opportunity.risk_score, 40)
             if opportunity.net_value_usd is not None and opportunity.net_value_usd <= 0:
                 opportunity.risk_reasons.append("Estimated gas cost is greater than or equal to reward value")
