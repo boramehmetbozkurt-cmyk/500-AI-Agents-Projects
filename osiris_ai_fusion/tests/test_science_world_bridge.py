@@ -49,11 +49,11 @@ def test_science_world_bridge_syncs_claims_and_deduplicates(tmp_path, monkeypatc
     assert second["entity_duplicates"] == 2
     assert second["edge_duplicates"] == 1
 
-    state = world.state("tenant-a")
-    assertions = [item for item in state["statements"] if item["predicate"] == "science_profile"]
+    snapshot = world.snapshot("tenant-a")
+    assertions = [item for item in snapshot["states"] if item["predicate"] == "science_profile"]
     assert len(assertions) == 2
-    assert all(item["statement_kind"] == "claim" for item in assertions)
-    assert all(item["source_ids"] == ["openalex"] for item in assertions)
+    assert all(item["effective"]["statement_kind"] == "claim" for item in assertions)
+    assert all(item["effective"]["source_ids"] == ["openalex"] for item in assertions)
 
 
 def test_bridge_is_tenant_scoped(tmp_path, monkeypatch):
@@ -80,4 +80,4 @@ def test_bridge_is_tenant_scoped(tmp_path, monkeypatch):
 
     assert bridge.receipt_counts("tenant-a") == {"entity": 1}
     assert bridge.receipt_counts("tenant-b") == {}
-    assert world.state("tenant-b")["statements"] == []
+    assert world.snapshot("tenant-b")["states"] == []
