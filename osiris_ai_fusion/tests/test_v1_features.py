@@ -120,7 +120,7 @@ def test_production_ui_files_exist_and_stream_real_backend():
     html = (root / "ui" / "index.html").read_text(encoding="utf-8")
     js = (root / "ui" / "assets" / "app.js").read_text(encoding="utf-8")
     css = root / "ui" / "assets" / "styles.css"
-    assert "OSIRIS FUSION" in html
+    assert "ORBYTHRA" in html
     assert 'fetch("/investigate/stream"' in js
     assert "sessionStorage" in js
     assert css.exists()
