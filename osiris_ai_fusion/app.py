@@ -35,6 +35,7 @@ from seal import verify_receipt
 from source_policy import policy_report
 from store import FusionStore
 from watcher import run_watcher
+from world import router as world_router
 
 logger = logging.getLogger("osiris_fusion")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
@@ -59,10 +60,10 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(
     title="OSIRIS Fusion SaaS",
-    version="1.3.0",
+    version="1.3.1",
     description=(
         "Multi-tenant public SaaS for evidence-first, authorization-aware AI research "
-        "with domain-agnostic multi-provider read-only federation."
+        "with domain-agnostic multi-provider federation and a verified living world model."
     ),
     lifespan=lifespan,
 )
@@ -85,12 +86,14 @@ if settings.cors_origins:
 if settings.saas_enabled:
     app.include_router(saas_router)
 
+app.include_router(world_router)
+
 
 @app.middleware("http")
 async def request_context(request: Request, call_next):
     request_id = request.headers.get("X-Request-ID") or secrets.token_hex(12)
     started = time.monotonic()
-    if request.url.path.startswith("/investigate"):
+    if request.url.path.startswith(("/investigate", "/world")):
         raw_identity = (
             request.headers.get("X-API-Key")
             or request.headers.get("Authorization")
@@ -145,6 +148,7 @@ async def health() -> dict[str, Any]:
         "service": "osiris-fusion-saas",
         "version": app.version,
         "saas": settings.saas_enabled,
+        "world": True,
     }
 
 
