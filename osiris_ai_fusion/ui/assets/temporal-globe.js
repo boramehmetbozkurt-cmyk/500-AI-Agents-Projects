@@ -1,7 +1,8 @@
-import * as maplibregl from "https://unpkg.com/maplibre-gl@6.9.0/dist/maplibre-gl.mjs";
+import * as THREE from "https://unpkg.com/three@0.186.0/build/three.module.js";
 
 const $ = (id) => document.getElementById(id);
 const REALITY_BRANCH = "reality";
+const EARTH_RADIUS = 1.8;
 const MODE_REALMS = {
   physical: ["physical"],
   history: ["historical_reconstruction"],
@@ -11,8 +12,6 @@ const MODE_REALMS = {
 };
 const FUTURE_TRUTH = new Set(["planned", "belief", "scenario"]);
 const state = {
-  map: null,
-  mapReady: false,
   mode: "physical",
   year: new Date().getUTCFullYear(),
   branch: REALITY_BRANCH,
@@ -21,8 +20,21 @@ const state = {
   portals: [],
   selected: null,
   requestSerial: 0,
+  scene: null,
+  camera: null,
+  renderer: null,
+  earthGroup: null,
+  featureGroup: null,
+  portalGroup: null,
+  clickTargets: [],
+  markerById: new Map(),
+  anchorById: new Map(),
+  dragging: false,
+  pointerStart: null,
+  lastPointer: null,
 };
 const els = {
+  globe: $("globe"),
   connection: $("connection"),
   layerModes: $("layerModes"),
   yearLabel: $("yearLabel"),
@@ -93,96 +105,203 @@ async function getJson(url) {
   return payload;
 }
 
-function truthColor(truth) {
-  if (truth === "fact") return "#7cf5b2";
-  if (truth === "claim") return "#6ce5ff";
-  if (truth === "reconstruction") return "#9a8cff";
-  if (truth === "planned") return "#ffbf69";
-  if (truth === "scenario") return "#ff7bd5";
-  if (truth === "belief") return "#ff8e8e";
-  return "#c2d0df";
+function truthHex(truth) {
+  if (truth === "fact") return 0x7cf5b2;
+  if (truth === "claim") return 0x6ce5ff;
+  if (truth === "reconstruction") return 0x9a8cff;
+  if (truth === "planned") return 0xffbf69;
+  if (truth === "scenario") return 0xff7bd5;
+  if (truth === "belief") return 0xff8e8e;
+  return 0xc2d0df;
 }
 
-function mapPaintExpression() {
-  return [
-    "match", ["get", "truth_mode"],
-    "fact", "#7cf5b2",
-    "claim", "#6ce5ff",
-    "reconstruction", "#9a8cff",
-    "planned", "#ffbf69",
-    "scenario", "#ff7bd5",
-    "belief", "#ff8e8e",
-    "#c2d0df",
-  ];
+function latLonToVector3(lon, lat, radius = EARTH_RADIUS) {
+  const phi = (90 - Number(lat)) * Math.PI / 180;
+  const theta = (Number(lon) + 180) * Math.PI / 180;
+  return new THREE.Vector3(
+    -radius * Math.sin(phi) * Math.cos(theta),
+    radius * Math.cos(phi),
+    radius * Math.sin(phi) * Math.sin(theta),
+  );
 }
 
-function emptyCollection() {
-  return {type: "FeatureCollection", features: []};
+function deterministicRandom(seed) {
+  let value = seed >>> 0;
+  return () => {
+    value = (1664525 * value + 1013904223) >>> 0;
+    return value / 4294967296;
+  };
 }
 
-function initGlobeLayers() {
-  if (!state.map || state.map.getSource("osiris-atlas")) return;
-  state.map.addSource("osiris-atlas", {type: "geojson", data: emptyCollection()});
-  state.map.addLayer({
-    id: "osiris-atlas-polygons",
-    type: "fill",
-    source: "osiris-atlas",
-    filter: ["==", ["geometry-type"], "Polygon"],
-    paint: {"fill-color": mapPaintExpression(), "fill-opacity": 0.34, "fill-outline-color": mapPaintExpression()},
-  });
-  state.map.addLayer({
-    id: "osiris-atlas-lines",
-    type: "line",
-    source: "osiris-atlas",
-    filter: ["==", ["geometry-type"], "LineString"],
-    paint: {"line-color": mapPaintExpression(), "line-width": 3, "line-opacity": 0.85},
-  });
-  state.map.addLayer({
-    id: "osiris-atlas-points",
-    type: "circle",
-    source: "osiris-atlas",
-    filter: ["==", ["geometry-type"], "Point"],
-    paint: {
-      "circle-color": mapPaintExpression(),
-      "circle-radius": ["interpolate", ["linear"], ["zoom"], 1, 4, 5, 7, 10, 11],
-      "circle-stroke-color": "rgba(255,255,255,.85)",
-      "circle-stroke-width": 1.2,
-      "circle-opacity": 0.92,
-    },
-  });
+function buildStars() {
+  const rand = deterministicRandom(0x0f51f15);
+  const positions = [];
+  for (let i = 0; i < 1400; i += 1) {
+    const radius = 10 + rand() * 18;
+    const theta = rand() * Math.PI * 2;
+    const z = rand() * 2 - 1;
+    const planar = Math.sqrt(1 - z * z);
+    positions.push(
+      radius * planar * Math.cos(theta),
+      radius * z,
+      radius * planar * Math.sin(theta),
+    );
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  const material = new THREE.PointsMaterial({color: 0x7c96ad, size: 0.015, transparent: true, opacity: 0.55});
+  state.scene.add(new THREE.Points(geometry, material));
+}
 
-  ["osiris-atlas-points", "osiris-atlas-lines", "osiris-atlas-polygons"].forEach((layer) => {
-    state.map.on("mouseenter", layer, () => { state.map.getCanvas().style.cursor = "pointer"; });
-    state.map.on("mouseleave", layer, () => { state.map.getCanvas().style.cursor = ""; });
-    state.map.on("click", layer, (event) => {
-      const rendered = event.features && event.features[0];
-      if (!rendered) return;
-      selectFeature(String(rendered.properties?.atlas_id || ""));
+function graticuleLine(points, opacity = 0.16) {
+  const geometry = new THREE.BufferGeometry().setFromPoints(points);
+  const material = new THREE.LineBasicMaterial({color: 0x88b7d8, transparent: true, opacity});
+  return new THREE.Line(geometry, material);
+}
+
+function buildGraticule() {
+  const group = new THREE.Group();
+  for (let lat = -75; lat <= 75; lat += 15) {
+    const points = [];
+    for (let lon = -180; lon <= 180; lon += 3) points.push(latLonToVector3(lon, lat, EARTH_RADIUS + 0.006));
+    group.add(graticuleLine(points, lat === 0 ? 0.28 : 0.13));
+  }
+  for (let lon = -180; lon < 180; lon += 15) {
+    const points = [];
+    for (let lat = -90; lat <= 90; lat += 3) points.push(latLonToVector3(lon, lat, EARTH_RADIUS + 0.006));
+    group.add(graticuleLine(points, lon === 0 ? 0.25 : 0.12));
+  }
+  state.earthGroup.add(group);
+}
+
+function initGlobe() {
+  const width = els.globe.clientWidth || window.innerWidth;
+  const height = els.globe.clientHeight || window.innerHeight;
+  state.scene = new THREE.Scene();
+  state.scene.background = new THREE.Color(0x03060b);
+  state.camera = new THREE.PerspectiveCamera(42, width / height, 0.1, 100);
+  state.camera.position.set(0, 0.15, 5.4);
+
+  state.renderer = new THREE.WebGLRenderer({antialias: true, powerPreference: "high-performance"});
+  state.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  state.renderer.setSize(width, height);
+  state.renderer.outputColorSpace = THREE.SRGBColorSpace;
+  els.globe.appendChild(state.renderer.domElement);
+
+  state.earthGroup = new THREE.Group();
+  state.earthGroup.rotation.x = -0.08;
+  state.earthGroup.rotation.y = -0.48;
+  state.scene.add(state.earthGroup);
+
+  const earth = new THREE.Mesh(
+    new THREE.SphereGeometry(EARTH_RADIUS, 96, 64),
+    new THREE.MeshPhongMaterial({color: 0x0a1a29, emissive: 0x02080e, shininess: 12, specular: 0x31536b}),
+  );
+  state.earthGroup.add(earth);
+
+  const atmosphere = new THREE.Mesh(
+    new THREE.SphereGeometry(EARTH_RADIUS * 1.035, 64, 48),
+    new THREE.MeshBasicMaterial({color: 0x4ab9ff, transparent: true, opacity: 0.055, side: THREE.BackSide, blending: THREE.AdditiveBlending}),
+  );
+  state.earthGroup.add(atmosphere);
+
+  buildGraticule();
+  buildStars();
+
+  state.featureGroup = new THREE.Group();
+  state.portalGroup = new THREE.Group();
+  state.earthGroup.add(state.portalGroup);
+  state.earthGroup.add(state.featureGroup);
+
+  state.scene.add(new THREE.AmbientLight(0x9dc8e8, 0.72));
+  const keyLight = new THREE.DirectionalLight(0xbce8ff, 2.1);
+  keyLight.position.set(4, 3, 5);
+  state.scene.add(keyLight);
+  const rim = new THREE.DirectionalLight(0x8d70ff, 1.1);
+  rim.position.set(-5, -2, -3);
+  state.scene.add(rim);
+
+  bindGlobeInteraction();
+  window.addEventListener("resize", resizeGlobe);
+  animate();
+}
+
+function resizeGlobe() {
+  if (!state.renderer || !state.camera) return;
+  const width = els.globe.clientWidth || window.innerWidth;
+  const height = els.globe.clientHeight || window.innerHeight;
+  state.camera.aspect = width / height;
+  state.camera.updateProjectionMatrix();
+  state.renderer.setSize(width, height);
+}
+
+function animate() {
+  requestAnimationFrame(animate);
+  if (!state.dragging && state.earthGroup) state.earthGroup.rotation.y += 0.00045;
+  if (state.renderer && state.scene && state.camera) state.renderer.render(state.scene, state.camera);
+}
+
+function pointerNdc(event) {
+  const rect = state.renderer.domElement.getBoundingClientRect();
+  return new THREE.Vector2(
+    ((event.clientX - rect.left) / rect.width) * 2 - 1,
+    -((event.clientY - rect.top) / rect.height) * 2 + 1,
+  );
+}
+
+function pickFeature(event) {
+  if (!state.clickTargets.length) return;
+  const raycaster = new THREE.Raycaster();
+  raycaster.params.Points.threshold = 0.05;
+  raycaster.setFromCamera(pointerNdc(event), state.camera);
+  const hits = raycaster.intersectObjects(state.clickTargets, false);
+  if (!hits.length) return;
+  const id = hits[0].object.userData.featureId;
+  if (id) selectFeature(String(id));
+}
+
+function bindGlobeInteraction() {
+  const canvas = state.renderer.domElement;
+  canvas.addEventListener("pointerdown", (event) => {
+    state.dragging = true;
+    state.pointerStart = {x: event.clientX, y: event.clientY};
+    state.lastPointer = {x: event.clientX, y: event.clientY};
+    canvas.setPointerCapture(event.pointerId);
+  });
+  canvas.addEventListener("pointermove", (event) => {
+    if (!state.dragging || !state.lastPointer) return;
+    const dx = event.clientX - state.lastPointer.x;
+    const dy = event.clientY - state.lastPointer.y;
+    state.earthGroup.rotation.y += dx * 0.005;
+    state.earthGroup.rotation.x += dy * 0.004;
+    state.earthGroup.rotation.x = Math.max(-1.25, Math.min(1.25, state.earthGroup.rotation.x));
+    state.lastPointer = {x: event.clientX, y: event.clientY};
+  });
+  canvas.addEventListener("pointerup", (event) => {
+    const start = state.pointerStart;
+    state.dragging = false;
+    state.lastPointer = null;
+    if (start) {
+      const moved = Math.hypot(event.clientX - start.x, event.clientY - start.y);
+      if (moved < 6) pickFeature(event);
+    }
+    state.pointerStart = null;
+  });
+  canvas.addEventListener("wheel", (event) => {
+    event.preventDefault();
+    state.camera.position.z = Math.max(3.25, Math.min(8.5, state.camera.position.z + event.deltaY * 0.003));
+  }, {passive: false});
+}
+
+function disposeGroup(group) {
+  const children = [...group.children];
+  children.forEach((child) => {
+    group.remove(child);
+    child.traverse((object) => {
+      object.geometry?.dispose?.();
+      if (Array.isArray(object.material)) object.material.forEach((material) => material.dispose?.());
+      else object.material?.dispose?.();
     });
-  });
-}
-
-function initMap() {
-  state.map = new maplibregl.Map({
-    container: "globe",
-    style: "https://demotiles.maplibre.org/globe.json",
-    center: [27.1, 38.4],
-    zoom: 1.35,
-    attributionControl: true,
-    maxPitch: 80,
-    canvasContextAttributes: {antialias: true},
-  });
-  state.map.addControl(new maplibregl.NavigationControl({visualizePitch: true}), "top-right");
-  state.map.addControl(new maplibregl.GlobeControl(), "top-right");
-  state.map.on("style.load", () => state.map.setProjection({type: "globe"}));
-  state.map.on("load", () => {
-    state.mapReady = true;
-    initGlobeLayers();
-    renderFeatures();
-  });
-  state.map.on("error", (event) => {
-    const message = event?.error?.message || "Globe basemap error";
-    if (!message.includes("AbortError")) els.notice.textContent = `Globe: ${message}`;
   });
 }
 
@@ -197,46 +316,122 @@ function temporalLabel(feature) {
   return label(start || end);
 }
 
-function atlasToGeoJson(feature) {
-  let geometry = feature.geometry || null;
-  if (!geometry && feature.space?.earth_anchor) {
-    geometry = {
-      type: "Point",
-      coordinates: [Number(feature.space.earth_anchor.longitude), Number(feature.space.earth_anchor.latitude)],
-    };
+function geometryPairs(value, output = []) {
+  if (!Array.isArray(value)) return output;
+  if (value.length >= 2 && Number.isFinite(Number(value[0])) && Number.isFinite(Number(value[1]))) {
+    output.push([Number(value[0]), Number(value[1])]);
+    return output;
   }
-  if (!geometry) return null;
-  return {
-    type: "Feature",
-    id: feature.id,
-    geometry,
-    properties: {
-      atlas_id: feature.id,
-      name: feature.name,
-      realm: feature.realm,
-      truth_mode: feature.truth_mode,
-      feature_type: feature.feature_type,
-      confidence: Number(feature.confidence || 0),
-      space_id: feature.space?.space_id || "",
-      temporal: temporalLabel(feature),
-    },
-  };
+  value.forEach((item) => geometryPairs(item, output));
+  return output;
+}
+
+function featureAnchor(feature) {
+  if (feature.geometry) {
+    const pairs = geometryPairs(feature.geometry.coordinates || []);
+    if (pairs.length) {
+      const sum = pairs.reduce((acc, pair) => [acc[0] + pair[0], acc[1] + pair[1]], [0, 0]);
+      return [sum[0] / pairs.length, sum[1] / pairs.length];
+    }
+  }
+  const anchor = feature.space?.earth_anchor;
+  if (anchor) return [Number(anchor.longitude), Number(anchor.latitude)];
+  return null;
+}
+
+function markerMesh(feature, lon, lat, color) {
+  const radius = 0.022 + Math.max(0, Math.min(1, Number(feature.confidence || 0))) * 0.018;
+  const marker = new THREE.Mesh(
+    new THREE.SphereGeometry(radius, 16, 12),
+    new THREE.MeshBasicMaterial({color}),
+  );
+  marker.position.copy(latLonToVector3(lon, lat, EARTH_RADIUS + 0.035));
+  marker.userData.featureId = feature.id;
+  state.featureGroup.add(marker);
+  state.clickTargets.push(marker);
+  state.markerById.set(feature.id, marker);
+  return marker;
+}
+
+function lineForCoordinates(coords, color, opacity = 0.8) {
+  const points = coords
+    .filter((pair) => Array.isArray(pair) && pair.length >= 2)
+    .map((pair) => latLonToVector3(Number(pair[0]), Number(pair[1]), EARTH_RADIUS + 0.018));
+  if (points.length < 2) return;
+  const geometry = new THREE.BufferGeometry().setFromPoints(points);
+  const material = new THREE.LineBasicMaterial({color, transparent: true, opacity});
+  state.featureGroup.add(new THREE.Line(geometry, material));
+}
+
+function renderGeometry(feature, color) {
+  const geometry = feature.geometry;
+  if (!geometry) return;
+  const type = geometry.type;
+  const coords = geometry.coordinates;
+  if (type === "Point" && Array.isArray(coords)) {
+    markerMesh(feature, Number(coords[0]), Number(coords[1]), color);
+  } else if (type === "MultiPoint" && Array.isArray(coords)) {
+    coords.slice(0, 250).forEach((pair) => markerMesh(feature, Number(pair[0]), Number(pair[1]), color));
+  } else if (type === "LineString" && Array.isArray(coords)) {
+    lineForCoordinates(coords, color);
+  } else if (type === "MultiLineString" && Array.isArray(coords)) {
+    coords.slice(0, 100).forEach((line) => lineForCoordinates(line, color));
+  } else if (type === "Polygon" && Array.isArray(coords)) {
+    coords.slice(0, 40).forEach((ring, index) => lineForCoordinates(ring, color, index === 0 ? 0.85 : 0.42));
+  } else if (type === "MultiPolygon" && Array.isArray(coords)) {
+    coords.slice(0, 50).forEach((polygon) => polygon.slice(0, 20).forEach((ring, index) => lineForCoordinates(ring, color, index === 0 ? 0.82 : 0.36)));
+  }
+}
+
+function portalArc(start, end) {
+  const a = latLonToVector3(start[0], start[1], EARTH_RADIUS + 0.055).normalize();
+  const b = latLonToVector3(end[0], end[1], EARTH_RADIUS + 0.055).normalize();
+  const points = [];
+  for (let i = 0; i <= 40; i += 1) {
+    const t = i / 40;
+    const point = a.clone().lerp(b, t).normalize();
+    const lift = EARTH_RADIUS + 0.055 + Math.sin(Math.PI * t) * 0.22;
+    points.push(point.multiplyScalar(lift));
+  }
+  const geometry = new THREE.BufferGeometry().setFromPoints(points);
+  const material = new THREE.LineBasicMaterial({color: 0xff7bd5, transparent: true, opacity: 0.4});
+  state.portalGroup.add(new THREE.Line(geometry, material));
+}
+
+function renderPortals() {
+  disposeGroup(state.portalGroup);
+  state.portals.forEach((portal) => {
+    const start = state.anchorById.get(String(portal.source_feature_id || ""));
+    const end = state.anchorById.get(String(portal.target_feature_id || ""));
+    if (start && end) portalArc(start, end);
+  });
 }
 
 function renderFeatures() {
-  const geo = [];
+  if (!state.featureGroup || !state.portalGroup) return;
+  disposeGroup(state.featureGroup);
+  state.clickTargets = [];
+  state.markerById.clear();
+  state.anchorById.clear();
+  const anchored = [];
   const unanchored = [];
+
   state.features.forEach((feature) => {
-    const item = atlasToGeoJson(feature);
-    if (item) geo.push(item);
-    else unanchored.push(feature);
+    const anchor = featureAnchor(feature);
+    if (!anchor || !Number.isFinite(anchor[0]) || !Number.isFinite(anchor[1])) {
+      unanchored.push(feature);
+      return;
+    }
+    anchored.push(feature);
+    state.anchorById.set(feature.id, anchor);
+    const color = truthHex(feature.truth_mode);
+    renderGeometry(feature, color);
+    if (!state.markerById.has(feature.id)) markerMesh(feature, anchor[0], anchor[1], color);
   });
+
   state.unanchored = unanchored;
-  if (state.mapReady) {
-    const source = state.map.getSource("osiris-atlas");
-    if (source) source.setData({type: "FeatureCollection", features: geo});
-  }
-  els.featureCount.textContent = String(geo.length);
+  renderPortals();
+  els.featureCount.textContent = String(anchored.length);
   els.virtualCount.textContent = String(unanchored.length);
   els.portalCount.textContent = String(state.portals.length);
 }
@@ -252,7 +447,10 @@ function sourceMarkup(sourceId) {
 function selectFeature(id) {
   const feature = state.features.find((item) => item.id === id);
   if (!feature) return;
+  if (state.selected?.id && state.markerById.has(state.selected.id)) state.markerById.get(state.selected.id).scale.setScalar(1);
   state.selected = feature;
+  const marker = state.markerById.get(feature.id);
+  if (marker) marker.scale.setScalar(1.8);
   els.featureTitle.textContent = feature.name || feature.id;
   const meta = feature.metadata || {};
   els.featureDescription.textContent = String(meta.description || meta.summary || `${feature.feature_type} · ${feature.realm}`);
@@ -271,11 +469,6 @@ function selectFeature(id) {
   els.featureMeta.innerHTML = rows.map(([key, value]) => `<div class="row"><span>${esc(key)}</span><span>${esc(value)}</span></div>`).join("");
   const sources = [...(feature.source_ids || []), ...(feature.evidence_ids || []).map((item) => `evidence:${item}`)];
   els.featureSources.innerHTML = sources.length ? sources.map(sourceMarkup).join("") : "<span>No source IDs exposed.</span>";
-
-  const point = atlasToGeoJson(feature);
-  if (point?.geometry?.type === "Point") {
-    state.map.easeTo({center: point.geometry.coordinates.slice(0, 2), zoom: Math.max(state.map.getZoom(), 5), duration: 900});
-  }
 }
 
 function realmUrls() {
@@ -323,7 +516,7 @@ async function loadFeatures() {
     renderFeatures();
     els.connection.textContent = "ATLAS LIVE";
     els.connection.className = "status-pill";
-    const extra = state.unanchored.length ? ` · ${state.unanchored.length} sanal öğe Earth anchor olmadan ayrı space'te.` : "";
+    const extra = state.unanchored.length ? ` · ${state.unanchored.length} sanal öğe Earth anchor olmadan ayrı coordinate-space'te.` : "";
     const futureRule = state.mode === "future" && state.branch === REALITY_BRANCH
       ? " Reality branch'te yalnız planned/belief görünür; scenario için fork seç."
       : "";
@@ -436,13 +629,9 @@ async function boot() {
   syncTimeControls();
   updateLayerButtons();
   bindControls();
-  initMap();
-  if (apiKey()) {
-    await loadBranches();
-    await loadFeatures();
-  } else {
-    await loadFeatures();
-  }
+  initGlobe();
+  if (apiKey()) await loadBranches();
+  await loadFeatures();
 }
 
 boot();
