@@ -22,6 +22,7 @@ from capabilities import (
     resolve_capability_gap,
 )
 from config import get_settings
+from engineering_intelligence import router as engineering_router
 from graph import investigate, investigate_stream
 from llm import ModelRouter
 from metrics import metrics
@@ -63,12 +64,12 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(
-    title="OSIRIS Fusion SaaS",
+    title="ORBYTHRA — Verifiable Temporal Reality Operating System",
     version="1.3.0",
     description=(
         "Multi-tenant public SaaS for evidence-first, authorization-aware AI research "
-        "with provider federation, a verified living world model, BCE-to-future reality atlas "
-        "and an evidence-bound science/genome knowledge graph."
+        "with provider federation, a verified living world model, BCE-to-future reality atlas, "
+        "an evidence-bound science/genome knowledge graph, and multi-layer engineering decision intelligence."
     ),
     lifespan=lifespan,
 )
@@ -92,6 +93,7 @@ if settings.saas_enabled:
     app.include_router(saas_router)
 
 app.include_router(world_router)
+app.include_router(engineering_router)
 app.include_router(reality_atlas_router)
 app.include_router(sensor_mesh_router)
 app.include_router(science_world_router)
@@ -102,7 +104,7 @@ app.include_router(science_graph_router)
 async def request_context(request: Request, call_next):
     request_id = request.headers.get("X-Request-ID") or secrets.token_hex(12)
     started = time.monotonic()
-    if request.url.path.startswith(("/investigate", "/world", "/science")):
+    if request.url.path.startswith(("/investigate", "/world", "/science", "/engineering")):
         raw_identity = (
             request.headers.get("X-API-Key")
             or request.headers.get("Authorization")
@@ -154,7 +156,7 @@ async def request_context(request: Request, call_next):
 async def health() -> dict[str, Any]:
     return {
         "status": "ok",
-        "service": "osiris-fusion-saas",
+        "service": "orbythra-reality-os",
         "version": app.version,
         "saas": settings.saas_enabled,
         "world": True,
@@ -163,6 +165,8 @@ async def health() -> dict[str, Any]:
         "science_genome_graph": True,
         "science_relationship_graph": True,
         "temporal_globe": True,
+        "engineering_intelligence": True,
+        "brand": "ORBYTHRA",
     }
 
 
@@ -486,6 +490,12 @@ if settings.saas_enabled and settings.saas_ui_dir.exists():
             raise HTTPException(status_code=404, detail="Science Genome Explorer UI disabled")
         return FileResponse(settings.ui_dir / "assets" / "science-explorer.html")
 
+    @app.get("/engineering-lab", include_in_schema=False)
+    async def engineering_lab_ui():
+        if not settings.ui_enabled or not settings.ui_dir.exists():
+            raise HTTPException(status_code=404, detail="Engineering Intelligence UI disabled")
+        return FileResponse(settings.ui_dir / "assets" / "engineering-lab.html")
+
 elif settings.ui_enabled and settings.ui_dir.exists():
 
     @app.get("/", include_in_schema=False)
@@ -503,3 +513,7 @@ elif settings.ui_enabled and settings.ui_dir.exists():
     @app.get("/science-explorer", include_in_schema=False)
     async def science_explorer_ui():
         return FileResponse(settings.ui_dir / "assets" / "science-explorer.html")
+
+    @app.get("/engineering-lab", include_in_schema=False)
+    async def engineering_lab_ui():
+        return FileResponse(settings.ui_dir / "assets" / "engineering-lab.html")
