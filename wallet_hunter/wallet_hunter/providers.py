@@ -212,6 +212,83 @@ class GoPlusProvider:
         return signals
 
 
+class OfficialEligibilityProvider:
+    """Checks an operator-configured official endpoint without signing or state changes."""
+
+    def __init__(self, client: httpx.AsyncClient):
+        self.client = client
+
+    @staticmethod
+    def _dig(payload: Any, path: list[str]) -> Any:
+        current = payload
+        for key in path:
+            if isinstance(current, dict) and key in current:
+                current = current[key]
+                continue
+            if isinstance(current, list) and key.isdigit():
+                index = int(key)
+                if index < len(current):
+                    current = current[index]
+                    continue
+            return None
+        return current
+
+    async def check(self, opportunity: Opportunity, address: str) -> Opportunity:
+        item = opportunity.model_copy(deep=True)
+        source = item.eligibility_source
+        if source is None or not source.trusted:
+            if item.status == "confirmed":
+                item.status = "candidate"
+            reason = "No trusted official wallet-specific eligibility source is configured"
+            if reason not in item.risk_reasons:
+                item.risk_reasons.append(reason)
+            return item
+
+        params = dict(source.query_params)
+        params[source.address_param] = address.lower()
+        try:
+            response = await self.client.get(source.url, params=params)
+            response.raise_for_status()
+            payload = response.json()
+            result = self._dig(payload, source.result_path)
+        except Exception as exc:
+            item.status = "unknown"
+            reason = f"Official eligibility check failed: {type(exc).__name__}"
+            if reason not in item.risk_reasons:
+                item.risk_reasons.append(reason)
+            return item
+
+        normalized = str(result).strip().lower()
+        positive = {str(value).strip().lower() for value in source.eligible_values}
+        if result is True or normalized in positive:
+            item.status = "confirmed"
+            item.eligibility_address = address.lower()
+            evidence = f"official_wallet_eligibility:{source.label}:{source.url}"
+            if evidence not in item.evidence:
+                item.evidence.append(evidence)
+            if source.reward_value_path:
+                reward = self._dig(payload, source.reward_value_path)
+                try:
+                    item.estimated_value_usd = float(reward)
+                except (TypeError, ValueError):
+                    pass
+            return item
+
+        if result is False or normalized in {"false", "0", "ineligible", "not_eligible", "no"}:
+            item.status = "rejected"
+            item.eligibility_address = address.lower()
+            reason = "Official eligibility source reports this wallet as ineligible"
+            if reason not in item.risk_reasons:
+                item.risk_reasons.append(reason)
+            return item
+
+        item.status = "unknown"
+        reason = "Official eligibility source returned an unrecognized eligibility value"
+        if reason not in item.risk_reasons:
+            item.risk_reasons.append(reason)
+        return item
+
+
 class ManifestOpportunityProvider:
     def load(self) -> list[Opportunity]:
         path = Path(settings.wallet_hunter_opportunities)
