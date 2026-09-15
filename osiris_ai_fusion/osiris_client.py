@@ -156,17 +156,26 @@ class OsirisClient:
                 await asyncio.sleep(0.25 * (2**attempt))
         raise RuntimeError(f"OSIRIS request failed: {last_error}")
 
-    async def fetch_tool(self, tool: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
+    async def fetch_tool(
+        self,
+        tool: str,
+        params: dict[str, Any] | None = None,
+        *,
+        query: str | None = None,
+    ) -> dict[str, Any]:
         canonical = normalize_tool_name(tool)
         url = self.tool_url(canonical)
         policy = asdict(policy_for_tool(canonical))
         try:
             data = await self._get(url, params)
-            record = make_evidence_record(tool=canonical, source_url=url, data=data)
+            record = make_evidence_record(
+                tool=canonical, source_url=url, data=data, query=query
+            )
         except Exception as exc:
             record = make_evidence_record(
                 tool=canonical,
                 source_url=url,
+                query=query,
                 error=f"{type(exc).__name__}: {exc}",
             )
         record["source_policy"] = policy

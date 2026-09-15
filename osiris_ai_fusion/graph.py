@@ -6,7 +6,7 @@ from typing import Any, AsyncIterator, TypedDict
 
 from langgraph.graph import END, StateGraph
 
-from capabilities import UniversalToolClient
+from capabilities import UniversalToolClient, is_research_tool
 from config import get_settings
 from correlation import correlate_evidence
 from evidence_schema import compact_sources, normalize_evidence
@@ -15,6 +15,7 @@ from planner import build_plan, deterministic_tools
 from provenance import confidence_from_evidence, evidence_bundle_digest, public_evidence_index
 from schemas import AnalysisReport, Claim, EvidenceItem, InvestigationPlan
 from seal import ReplayGuard, authorize_execution, seal_intent, sign_receipt
+from subquery import allocate_subquery_calls, plan_subqueries
 
 
 class AgentState(TypedDict, total=False):
@@ -24,6 +25,7 @@ class AgentState(TypedDict, total=False):
     plan: dict[str, Any]
     planned_tools: list[str]
     planner_model: dict[str, str]
+    subqueries: list[dict[str, Any]]
     evidence: dict[str, Any]
     evidence_index: list[dict[str, Any]]
     evidence_items: list[dict[str, Any]]
@@ -51,7 +53,16 @@ async def planner_node(state: AgentState) -> AgentState:
     )
     if not plan.tools:
         raise PermissionError("No authorized capability remains after planning")
-    return {"plan": plan.model_dump(), "planned_tools": plan.tools, "planner_model": model}
+    subqueries = await plan_subqueries(state["query"])
+    return {
+        "plan": plan.model_dump(),
+        "planned_tools": plan.tools,
+        "planner_model": model,
+        "subqueries": [
+            {"query": item.query, "depth": item.depth, "origin": item.origin}
+            for item in subqueries
+        ],
+    }
 
 
 async def collector_node(state: AgentState) -> AgentState:
@@ -73,18 +84,34 @@ async def collector_node(state: AgentState) -> AgentState:
     authorize_execution(intent, state["planned_tools"], ReplayGuard(settings.seal_replay_db))
     semaphore = asyncio.Semaphore(settings.max_parallel_tools)
 
+    # Subqueries reuse the tools the intent already sealed and spend only the
+    # budget the root plan left unspent, so recursion can neither reach a tool the
+    # caller did not authorize nor push the investigation past max_tool_calls.
+    planned_tools: list[str] = state["planned_tools"]
+    subquery_calls = allocate_subquery_calls(
+        planned_tools=planned_tools,
+        research_tools=[tool for tool in planned_tools if is_research_tool(tool)],
+        subqueries=[str(item["query"]) for item in state.get("subqueries", [])],
+        max_tool_calls=settings.max_tool_calls,
+    )
+
     async with UniversalToolClient() as client:
-        async def one(tool: str) -> tuple[str, Any]:
+        async def one(key: str, tool: str, question: str) -> tuple[str, Any]:
             async with semaphore:
-                return tool, await client.fetch_tool(
+                return key, await client.fetch_tool(
                     tool,
-                    query=state["query"],
+                    query=question,
                     scope=sealed_scope,
                 )
 
-        results = await asyncio.gather(*(one(tool) for tool in state["planned_tools"]))
+        root = [one(tool, tool, state["query"]) for tool in planned_tools]
+        derived = [
+            one(f"{tool}#sq{index + 1}", tool, question)
+            for index, (tool, question) in enumerate(subquery_calls)
+        ]
+        results = await asyncio.gather(*root, *derived)
 
-    evidence = {tool: data for tool, data in results}
+    evidence = {key: data for key, data in results}
     return {
         "evidence": evidence,
         "evidence_index": public_evidence_index(evidence),

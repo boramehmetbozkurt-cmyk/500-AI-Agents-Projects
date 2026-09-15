@@ -68,13 +68,19 @@ def correlate_evidence(
     evidence: dict[str, Any],
 ) -> tuple[list[CorrelationCandidate], list[MapMarker]]:
     by_tool: dict[str, list[dict[str, Any]]] = {}
+    evidence_id_by_tool: dict[str, str] = {}
     markers: list[MapMarker] = []
-    for tool, record in evidence.items():
+    # Subquery planning puts several records from one tool in the bundle under
+    # different keys. Grouping by the key would let a tool correlate with itself
+    # and present that as two independent sources agreeing.
+    for key, record in evidence.items():
         if not record.get("ok"):
             continue
+        tool = str(record.get("tool") or key)
         objects = _extract_objects(record.get("data"))
         evidence_id = str(record.get("evidence_id", ""))
-        by_tool[tool] = objects
+        by_tool.setdefault(tool, []).extend(objects)
+        evidence_id_by_tool.setdefault(tool, evidence_id)
         for obj in objects[:80]:
             markers.append(
                 MapMarker(
@@ -112,8 +118,8 @@ def correlate_evidence(
                                 "nedensellik değildir."
                             ),
                             evidence_ids=[
-                                evidence[tool_a].get("evidence_id", ""),
-                                evidence[tool_b].get("evidence_id", ""),
+                                evidence_id_by_tool.get(tool_a, ""),
+                                evidence_id_by_tool.get(tool_b, ""),
                             ],
                         )
                     )

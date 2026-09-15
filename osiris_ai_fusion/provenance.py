@@ -26,15 +26,24 @@ def make_evidence_record(
     source_url: str,
     data: Any | None = None,
     error: str | None = None,
+    query: str | None = None,
 ) -> dict[str, Any]:
+    """Build one evidence record.
+
+    ``query`` records which question this record answers. With recursive subquery
+    planning a single investigation issues several different questions, so the
+    question is part of the record's provenance and is therefore inside the
+    digest rather than annotated onto it afterwards.
+    """
     fetched_at = int(time.time())
     evidence_id = "ev_" + hashlib.sha256(
-        f"{tool}|{source_url}|{fetched_at}".encode("utf-8")
+        f"{tool}|{source_url}|{query or ''}|{fetched_at}".encode("utf-8")
     ).hexdigest()[:16]
     body = {
         "evidence_id": evidence_id,
         "tool": tool,
         "source_url": source_url,
+        "query": query,
         "fetched_at": fetched_at,
         "ok": error is None,
         "data": data if error is None else None,
@@ -50,6 +59,7 @@ def evidence_bundle_digest(evidence: dict[str, Any]) -> str:
             "evidence_id": value.get("evidence_id"),
             "tool": value.get("tool"),
             "source_url": value.get("source_url"),
+            "query": value.get("query"),
             "fetched_at": value.get("fetched_at"),
             "ok": value.get("ok"),
             "digest": value.get("digest"),
@@ -81,6 +91,7 @@ def public_evidence_index(evidence: dict[str, Any]) -> list[dict[str, Any]]:
             "evidence_id": record.get("evidence_id"),
             "tool": record.get("tool"),
             "source_url": record.get("source_url"),
+            "query": record.get("query"),
             "fetched_at": record.get("fetched_at"),
             "ok": record.get("ok"),
             "digest": record.get("digest"),
