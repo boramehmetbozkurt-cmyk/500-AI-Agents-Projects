@@ -7,6 +7,7 @@
     save: $("saveInput"), run: $("runBtn"), connection: $("connectionBadge"),
     settingsBtn: $("settingsBtn"), dialog: $("settingsDialog"), apiKey: $("apiKeyInput"),
     saveSettings: $("saveSettingsBtn"), plan: $("planView"), plannerModel: $("plannerModel"),
+    cognitive: $("cognitiveView"), reflection: $("reflectionView"),
     evidence: $("evidenceView"), evidenceCount: $("evidenceCount"), correlations: $("correlationView"),
     correlationCount: $("correlationCount"), markerCount: $("markerCount"), bluf: $("bluf"),
     claims: $("claims"), confidence: $("confidenceBadge"), receipt: $("receiptView"), seal: $("sealBadge"),
@@ -54,8 +55,9 @@
   }
 
   function setStage(stage) {
-    const order = ["plan", "evidence", "correlation", "enrichment", "analysis", "receipt", "complete"];
-    const current = order.indexOf(stage);
+    const alias = stage === "refinement" ? "reflection" : stage === "memory_write" ? "receipt" : stage;
+    const order = ["memory", "plan", "evidence", "correlation", "enrichment", "analysis", "reflection", "receipt", "complete"];
+    const current = order.indexOf(alias);
     document.querySelectorAll(".stage").forEach((node) => {
       const idx = order.indexOf(node.dataset.stage);
       node.classList.toggle("active", idx === current);
@@ -98,9 +100,19 @@
     else if (bounds.length > 1) map.fitBounds(bounds, { padding: [30, 30], maxZoom: 9 });
   }
 
-  function renderPlan(plan, model) {
+  function renderPlan(plan, model, cognitivePlan) {
     els.plan.textContent = JSON.stringify(plan || {}, null, 2);
     els.plannerModel.textContent = model ? `${model.provider || "—"} / ${model.model || "—"}` : "—";
+    if (cognitivePlan) els.cognitive.textContent = JSON.stringify(cognitivePlan, null, 2);
+  }
+
+  function renderReflection(evaluation, adaptation, model, memory) {
+    els.reflection.textContent = JSON.stringify({
+      self_evaluation: evaluation || null,
+      adaptation: adaptation || null,
+      refinement_model: model || null,
+      memory: memory || null
+    }, null, 2);
   }
 
   function renderEvidence(items = []) {
@@ -232,7 +244,9 @@
   }
 
   function resetInvestigationUi() {
-    setStage("plan");
+    setStage("memory");
+    els.cognitive.textContent = "İlgili geçmiş araştırmalar aranıyor ve hedefler ayrıştırılıyor…";
+    els.reflection.textContent = "Self-evaluation bekleniyor…";
     els.plan.textContent = "Planlanıyor…";
     els.plannerModel.textContent = "—";
     els.evidenceCount.textContent = "0 SOURCES";
@@ -266,7 +280,13 @@
     if (!event || !event.stage) return;
     setStage(event.stage);
     log(`stage=${event.stage}`, event);
-    if (event.stage === "plan") renderPlan(event.plan, event.model);
+    if (event.stage === "memory") {
+      els.cognitive.textContent = JSON.stringify({
+        recalled_count: event.recalled_count || 0,
+        cognitive_plan: event.cognitive_plan || {}
+      }, null, 2);
+    }
+    if (event.stage === "plan") renderPlan(event.plan, event.model, event.cognitive_plan);
     if (event.stage === "evidence") {
       renderEvidence(event.evidence_index || []);
       if (event.confidence) {
@@ -287,13 +307,24 @@
       }
     }
     if (event.stage === "analysis") renderReport(event.report || {}, null);
+    if (event.stage === "reflection") renderReflection(event.self_evaluation || {}, null, null, null);
+    if (event.stage === "refinement") {
+      if (event.report) renderReport(event.report, null);
+      renderReflection(event.self_evaluation || {}, event.adaptation || {}, event.model || {}, null);
+    }
     if (event.stage === "receipt") renderReceipt(event.receipt || {}, event.security || {});
+    if (event.stage === "memory_write") {
+      const current = els.reflection.textContent ? JSON.parse(els.reflection.textContent) : {};
+      current.memory = event.memory || {};
+      els.reflection.textContent = JSON.stringify(current, null, 2);
+    }
     if (event.stage === "complete") {
       const result = event.result || {};
-      renderPlan(result.plan, result.planner_model);
+      renderPlan(result.plan, result.planner_model, result.cognitive_plan);
       renderEvidence(result.evidence_index || []);
       renderCorrelations(result.correlation_candidates || []);
       renderReport(result.report || {}, result.confidence || {});
+      renderReflection(result.self_evaluation || {}, result.adaptation || {}, result.refinement_model || {}, result.memory || {});
       renderReceipt(result.receipt || {}, result.security || {});
     }
     if (event.stage === "error") throw new Error(event.detail || event.error || "Search failed");
