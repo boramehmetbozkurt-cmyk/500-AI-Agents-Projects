@@ -29,6 +29,15 @@
     return String(value ?? "").replace(/[&<>'\"]/g, (char) => ({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'\"':"&quot;"})[char]);
   }
 
+  function safeHttpUrl(value) {
+    try {
+      const url = new URL(String(value || ""));
+      return url.protocol === "https:" || url.protocol === "http:" ? url.href : "";
+    } catch (_) {
+      return "";
+    }
+  }
+
   function log(message, obj) {
     const stamp = new Date().toISOString();
     const payload = obj === undefined ? message : `${message}\n${JSON.stringify(obj, null, 2)}`;
@@ -73,7 +82,7 @@
       const lat = Number(item.lat ?? item.latitude);
       const lon = Number(item.lon ?? item.lng ?? item.longitude);
       if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
-      const title = escapeHtml(item.title || item.label || item.tool || "OSINT evidence");
+      const title = escapeHtml(item.title || item.label || item.tool || "ORBYTHRA evidence");
       const evidenceId = escapeHtml(item.evidence_id || "");
       L.circleMarker([lat, lon], { radius: 7, weight: 2, fillOpacity: .7 })
         .bindPopup(`<strong>${title}</strong>${evidenceId ? `<br><code>${evidenceId}</code>` : ""}`)
@@ -93,13 +102,17 @@
     els.evidenceCount.textContent = `${items.length} SOURCES`;
     if (!items.length) {
       els.evidence.className = "stack empty";
-      els.evidence.textContent = "Kanıt kaydı bulunamadı.";
+      els.evidence.textContent = "Kaynak bulunamadı.";
       return;
     }
     els.evidence.className = "stack";
     els.evidence.innerHTML = items.map((item) => {
       const status = item.ok === false ? "FAILED" : "OK";
-      return `<div class="card"><strong>${escapeHtml(item.tool || "source")} · ${status}</strong><small>${escapeHtml(item.evidence_id || "")}</small><small>${escapeHtml(item.source_url || "")}</small><small>SHA ${escapeHtml((item.digest || "").slice(0, 20))}${item.digest ? "…" : ""}</small></div>`;
+      const url = safeHttpUrl(item.source_url);
+      const source = url
+        ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(url)}</a>`
+        : escapeHtml(item.source_url || "");
+      return `<div class="card"><strong>${escapeHtml(item.tool || "source")} · ${status}</strong><small>${escapeHtml(item.evidence_id || "")}</small><small>${source}</small><small>SHA ${escapeHtml((item.digest || "").slice(0, 20))}${item.digest ? "…" : ""}</small></div>`;
     }).join("");
   }
 
@@ -107,7 +120,7 @@
     els.correlationCount.textContent = `${items.length} CANDIDATES`;
     if (!items.length) {
       els.correlations.className = "stack empty";
-      els.correlations.textContent = "Korelasyon adayı bulunamadı.";
+      els.correlations.textContent = "İlişki/korelasyon adayı bulunamadı.";
       return;
     }
     els.correlations.className = "stack";
@@ -119,12 +132,12 @@
     els.confidence.className = `badge ${score >= .8 ? "ok" : score >= .5 ? "warn" : "muted"}`;
     els.confidence.textContent = `CONFIDENCE ${Number.isFinite(score) ? Math.round(score * 100) : 0}%`;
     els.bluf.classList.remove("empty");
-    els.bluf.textContent = report?.bluf || "No synthesized conclusion.";
+    els.bluf.textContent = report?.bluf || "Kaynaklardan sentezlenmiş sonuç üretilemedi.";
     const claims = Array.isArray(report?.claims) ? report.claims : [];
     els.claims.innerHTML = claims.length ? claims.map((claim) => {
       const refs = (claim.evidence_ids || []).map((ref) => `<span class="ref">${escapeHtml(ref)}</span>`).join("");
       return `<div class="claim"><div class="claim-top"><span class="claim-kind">${escapeHtml(claim.kind || "claim")}</span><span class="micro">${escapeHtml(claim.confidence ?? "")}</span></div><p>${escapeHtml(claim.text || claim.claim || "")}</p><div class="refs">${refs}</div></div>`;
-    }).join("") : `<div class="empty">Kanıta bağlı claim üretilmedi.</div>`;
+    }).join("") : `<div class="empty">Kanıta bağlı ek claim üretilmedi.</div>`;
     renderMarkers(report?.map_markers || []);
   }
 
@@ -165,14 +178,14 @@
     els.plannerModel.textContent = "—";
     els.evidenceCount.textContent = "0 SOURCES";
     els.evidence.className = "stack empty";
-    els.evidence.textContent = "Kanıt toplanıyor…";
+    els.evidence.textContent = "Kaynaklar taranıyor…";
     els.correlationCount.textContent = "0 CANDIDATES";
     els.correlations.className = "stack empty";
-    els.correlations.textContent = "Korelasyon bekleniyor…";
+    els.correlations.textContent = "İlişkiler çıkarılıyor…";
     els.bluf.className = "bluf empty";
-    els.bluf.textContent = "Analiz bekleniyor…";
+    els.bluf.textContent = "ORBYTHRA cevabı hazırlanıyor…";
     els.claims.innerHTML = "";
-    els.receipt.textContent = "SEAL doğrulaması bekleniyor…";
+    els.receipt.textContent = "Doğrulama makbuzu bekleniyor…";
     els.seal.className = "badge muted";
     els.seal.textContent = "PENDING";
     renderMarkers([]);
@@ -204,7 +217,7 @@
       renderReport(result.report || {}, result.confidence || {});
       renderReceipt(result.receipt || {});
     }
-    if (event.stage === "error") throw new Error(event.detail || event.error || "Investigation failed");
+    if (event.stage === "error") throw new Error(event.detail || event.error || "Search failed");
   }
 
   async function streamInvestigation(payload) {
@@ -247,7 +260,7 @@
     if (query.length < 3) return;
     busy = true;
     els.run.disabled = true;
-    els.run.textContent = "RUNNING…";
+    els.run.textContent = "SEARCHING…";
     resetInvestigationUi();
     const payload = {
       query,
@@ -263,15 +276,15 @@
       setConnection(true);
     } catch (error) {
       setConnection(false, String(error));
-      log("investigation_error", { message: error.message || String(error) });
+      log("search_error", { message: error.message || String(error) });
       els.bluf.className = "bluf empty";
-      els.bluf.textContent = `Araştırma tamamlanamadı: ${error.message || error}`;
+      els.bluf.textContent = `Arama tamamlanamadı: ${error.message || error}`;
       els.seal.className = "badge danger";
       els.seal.textContent = "FAILED";
     } finally {
       busy = false;
       els.run.disabled = false;
-      els.run.textContent = "INVESTIGATE";
+      els.run.textContent = "ASK ORBYTHRA";
     }
   });
 
