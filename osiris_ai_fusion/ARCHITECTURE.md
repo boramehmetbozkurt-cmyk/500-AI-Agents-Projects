@@ -17,6 +17,41 @@ sources. It is not a generic autonomous computer-use agent.
 8. Verifier binds intent, executed tools, evidence digest and analysis digest into a receipt.
 9. API returns evidence, confidence metadata, analysis, model identity and receipt.
 
+## Recursive subquery planning
+
+A single-shot planner answers a compound question with one fan-out, so the parts
+that need separate research never get it. `subquery.py` decomposes a question into
+bounded subquestions and recurses into those, breadth-first.
+
+- **Decomposition is refused more often than attempted.** Each level splits on the
+  strongest boundary still present — sentence ends first, then `;` — and leaves the
+  rest for the level below, which is what gives recursion somewhere to descend.
+  A split is taken only when *every* fragment can stand alone; a half-split that
+  strands `"İzmir"` without its predicate is worse evidence than not recursing.
+  Coordinating conjunctions (`ve`, `and`) are never boundaries: they join one
+  predicate far more often than two questions. When the planner model is enabled it
+  handles the cases a regex cannot, and a model outage falls back to the root
+  investigation unchanged.
+- **Authority is never widened.** Subqueries reuse the tools the root plan already
+  sealed, so recursion cannot reach a capability the sealed intent did not
+  authorize. `allocate_subquery_calls` enforces this by construction.
+- **Budget is never widened.** Subquery calls come out of the tool-call budget the
+  root plan left unspent, so enabling recursion redistributes work instead of
+  adding it, and `max_tool_calls` remains the ceiling for the whole investigation.
+- **Fan-out targets query-sensitive tools only.** OSIRIS feeds return the same
+  payload whatever is asked and local kinds reason from the model rather than
+  fetching, so asking either a second question would duplicate one payload under
+  several questions and manufacture corroboration that does not exist.
+
+Which question a record answers is provenance, so `query` lives inside the evidence
+record and inside its digest rather than being annotated on afterwards. Subquery
+records share their tool's name; the evidence bundle keys them `tool#sqN`, and
+correlation and normalization both group by the record's tool rather than that key
+so a tool can never correlate with itself and be reported as two agreeing sources.
+
+Settings: `SUBQUERY_PLANNING_ENABLED` (default true), `SUBQUERY_MAX_COUNT`
+(default 3), `SUBQUERY_MAX_DEPTH` (default 2).
+
 ## Unified evidence schema
 
 Provider federation, the passive feeds and the AI Research Council each answer in

@@ -127,6 +127,17 @@ class Settings:
         default_factory=lambda: _int("MAX_PROMPT_EVIDENCE_CHARS", 60_000)
     )
     max_tool_calls: int = field(default_factory=lambda: _int("MAX_TOOL_CALLS", 8))
+    # Recursive subquery planning spends only the tool-call budget the root plan
+    # leaves unspent, so enabling it redistributes work rather than adding any.
+    subquery_planning_enabled: bool = field(
+        default_factory=lambda: _bool("SUBQUERY_PLANNING_ENABLED", True)
+    )
+    subquery_max_count: int = field(
+        default_factory=lambda: _int("SUBQUERY_MAX_COUNT", 3)
+    )
+    subquery_max_depth: int = field(
+        default_factory=lambda: _int("SUBQUERY_MAX_DEPTH", 2)
+    )
     seal_ttl_seconds: int = field(
         default_factory=lambda: _int("SEAL_TTL_SECONDS", 300)
     )
@@ -206,6 +217,14 @@ class Settings:
                 raise RuntimeError("Missing required production settings: " + ", ".join(missing))
         if self.max_parallel_tools < 1:
             raise RuntimeError("MAX_PARALLEL_TOOLS must be >= 1")
+        if self.subquery_max_count < 0:
+            raise RuntimeError("SUBQUERY_MAX_COUNT must be >= 0")
+        if self.subquery_max_count > 12:
+            raise RuntimeError("SUBQUERY_MAX_COUNT must be <= 12")
+        if self.subquery_max_depth < 1:
+            raise RuntimeError("SUBQUERY_MAX_DEPTH must be >= 1")
+        if self.subquery_max_depth > 4:
+            raise RuntimeError("SUBQUERY_MAX_DEPTH must be <= 4")
         if self.max_tool_calls < 1:
             raise RuntimeError("MAX_TOOL_CALLS must be >= 1")
         if self.max_evidence_bytes < 10_000:

@@ -276,9 +276,12 @@ def normalize_evidence(
     now = int(time.time()) if now is None else now
     merged: dict[str, dict[str, Any]] = {}
 
-    for tool, record in sorted(evidence.items()):
+    for key, record in sorted(evidence.items()):
         if not isinstance(record, dict) or record.get("ok") is not True:
             continue
+        # Subquery records are keyed "tool#sqN" in the bundle but belong to the
+        # tool named inside the record; the key is a slot, not an origin.
+        tool = str(record.get("tool") or key)
         evidence_id = str(record.get("evidence_id") or "")
         for provider_id, payload in _origins(record.get("data")):
             for raw in extract_source_items(payload):

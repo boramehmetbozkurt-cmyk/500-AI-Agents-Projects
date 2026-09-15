@@ -221,6 +221,26 @@ def capability_ready(spec: CapabilitySpec) -> bool:
     return False
 
 
+# Kinds whose result actually depends on the question text. OSIRIS feeds return
+# the same payload whatever is asked, and local kinds reason from the model rather
+# than fetching evidence, so fanning subqueries out to either would duplicate one
+# payload under several questions and manufacture corroboration that does not exist.
+RESEARCH_KINDS = frozenset({"provider_federation", "http_json"})
+
+
+def is_research_tool(tool: str) -> bool:
+    """True when re-running this tool with a different question yields new evidence."""
+    if tool in READ_ONLY_TOOLS:
+        return False
+    spec = capability_specs().get(tool)
+    return bool(
+        spec
+        and spec.read_only
+        and spec.auto_execute
+        and spec.kind in RESEARCH_KINDS
+    )
+
+
 def auto_tool_names() -> set[str]:
     names = set(READ_ONLY_TOOLS)
     for name, spec in capability_specs().items():
@@ -374,7 +394,7 @@ class UniversalToolClient:
                 raise RuntimeError(
                     "UniversalToolClient must be used as an async context manager"
                 )
-            return await self._osiris.fetch_tool(tool)
+            return await self._osiris.fetch_tool(tool, query=query)
 
         spec = capability_specs().get(tool)
         if spec is None or not spec.read_only or not spec.auto_execute:
@@ -385,6 +405,7 @@ class UniversalToolClient:
         if not capability_ready(spec):
             return make_evidence_record(
                 tool=tool,
+                query=query,
                 source_url=f"capability://{tool}",
                 error=(
                     "Capability is not configured; set "
@@ -401,6 +422,7 @@ class UniversalToolClient:
             )
             return make_evidence_record(
                 tool=tool,
+                query=query,
                 source_url="federation://provider-registry",
                 data=data,
             )
@@ -410,6 +432,7 @@ class UniversalToolClient:
             gaps = resolve_capability_gap(query, inferred)
             return make_evidence_record(
                 tool=tool,
+                query=query,
                 source_url="local://capability-gap",
                 data={
                     "status": "provider_required",
@@ -429,6 +452,7 @@ class UniversalToolClient:
             data = {"expression": expression, "result": _safe_calc(expression)}
             return make_evidence_record(
                 tool=tool,
+                query=query,
                 source_url="local://calculator",
                 data=data,
             )
@@ -448,6 +472,7 @@ class UniversalToolClient:
             }
             return make_evidence_record(
                 tool=tool,
+                query=query,
                 source_url="model://router",
                 data=data,
             )
@@ -481,10 +506,13 @@ class UniversalToolClient:
                     ):
                         raise ValueError("Connector returned non-JSON content")
                     data = response.json()
-                return make_evidence_record(tool=tool, source_url=url, data=data)
+                return make_evidence_record(
+                    tool=tool, source_url=url, data=data, query=query
+                )
             except Exception as exc:
                 return make_evidence_record(
                     tool=tool,
+                    query=query,
                     source_url=url,
                     error=f"{type(exc).__name__}: {exc}",
                 )
