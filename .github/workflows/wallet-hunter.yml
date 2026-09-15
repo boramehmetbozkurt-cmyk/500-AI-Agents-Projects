@@ -1,0 +1,30 @@
+name: Wallet Hunter CI
+
+on:
+  pull_request:
+    paths:
+      - "wallet_hunter/**"
+      - ".github/workflows/wallet-hunter.yml"
+  push:
+    branches:
+      - wallet-hunter-standalone-v0
+    paths:
+      - "wallet_hunter/**"
+      - ".github/workflows/wallet-hunter.yml"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: wallet_hunter
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install --upgrade pip
+      - run: pip install -e .[dev]
+      - run: ruff check wallet_hunter tests
+      - run: python -m compileall -q wallet_hunter
+      - run: pytest -q
