@@ -66,8 +66,6 @@ async def _run_persistent_goals(autonomy: AutonomyStore) -> None:
                 "memory_write_enabled": True,
             }
             result = await investigate(str(goal["objective"]), scope=scope)
-            evaluation = result.get("self_evaluation") or {}
-            autonomy.observe_evaluation(workspace_id, evaluation)
             autonomy.record_goal_run(goal_id, workspace_id, result)
         except Exception:
             logger.exception("persistent_goal_run_failed goal_id=%s", goal_id)
