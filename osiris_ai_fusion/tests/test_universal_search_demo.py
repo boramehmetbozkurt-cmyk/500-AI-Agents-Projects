@@ -13,7 +13,7 @@ def test_public_demo_is_search_first_and_answer_producing() -> None:
         'id="confidence"',
         'backendSearch(query)',
         'publicSearch(query)',
-        'tr.wikipedia.org',
+        'wikipedia.org/w/api.php',
         'api.openalex.org',
         '/investigate',
     ]
