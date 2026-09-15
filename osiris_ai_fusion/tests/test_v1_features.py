@@ -195,12 +195,12 @@ def test_provider_manifest_can_add_multiple_providers(monkeypatch, tmp_path):
     assert "finance_beta" in routed
 
 
-def test_general_web_is_fallback_not_central_router(monkeypatch):
+def test_current_query_prefers_ready_domain_provider_over_general_fallback(monkeypatch):
     monkeypatch.setenv("FUSION_WEB_SEARCH_URL", "https://example.invalid/search")
     monkeypatch.delenv("FUSION_NEWS_URL", raising=False)
     query = "Bugün Zorblax-99 olayı gerçekleşti mi?"
     routed = [provider.provider_id for provider in route_providers(query)]
-    assert routed == ["general_web"]
+    assert "gdelt_news_global" in routed
     assert deterministic_tools(query) == ["provider_federation"]
 
 
@@ -244,6 +244,10 @@ def test_provider_catalog_has_multiple_real_live_domains(monkeypatch):
     assert rows["openalex"]["ready"] is True
     assert rows["crossref"]["ready"] is True
     assert rows["wikipedia_tr"]["ready"] is True
+    assert rows["wikipedia_en"]["ready"] is True
+    assert rows["wikidata_global"]["ready"] is True
+    assert rows["gdelt_news_global"]["ready"] is True
+    assert rows["europe_pmc"]["ready"] is True
     assert rows["osm_nominatim"]["ready"] is True
     assert rows["hn_algolia"]["ready"] is True
     assert rows["finance"]["ready"] is False
