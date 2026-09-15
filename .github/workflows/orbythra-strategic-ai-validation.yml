@@ -16,13 +16,13 @@ permissions:
   contents: read
 
 concurrency:
-  group: orbythra-strategic-ai-validation
-  cancel-in-progress: false
+  group: orbythra-strategic-ai-validation-v2
+  cancel-in-progress: true
 
 jobs:
   strategic-validation:
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 15
     env:
       ORBYTHRA_BENCHMARK_BASE_URL: "https://orbythra-adaptive-core-llftzg.v2.appdeploy.ai"
     steps:
@@ -51,7 +51,8 @@ jobs:
           python run_browser_strategic_validation.py \
             --base-url "$ORBYTHRA_BENCHMARK_BASE_URL" \
             --suite benchmarks/strategic_ai_validation_v1.json \
-            --timeout 180 \
+            --timeout 90 \
+            --concurrency 3 \
             --output ../dist/strategic-ai-validation/result.json
           code=$?
           echo "exit_code=$code" >> "$GITHUB_OUTPUT"
