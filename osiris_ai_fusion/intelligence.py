@@ -7,6 +7,7 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
 
+from autonomy_api import router as operator_router
 from saas import AuthContext, require_identity
 from world import REALITY_BRANCH, WorldStore, world_store
 
@@ -122,8 +123,6 @@ def score_world_state(
         + 0.10 * relation_density
     )
 
-    # Deliberately marked uncalibrated. It is a comparable change signal expressed on a
-    # probability-like 0-100 scale, not a statistical probability of a future event.
     logistic_input = (
         -2.3
         + 3.1 * change_intensity
@@ -245,6 +244,7 @@ async def intelligence_info(auth: Identity) -> dict[str, Any]:
             "dispute pressure",
         ],
         "calibrated_forecast": False,
+        "persistent_operator": "/intelligence/operator",
     }
 
 
@@ -263,3 +263,6 @@ async def intelligence_signals(
         auth.tenant_id,
         IntelligenceScoreRequest(branch_id=branch_id, pulse_window_seconds=window_seconds),
     )
+
+
+router.include_router(operator_router)
