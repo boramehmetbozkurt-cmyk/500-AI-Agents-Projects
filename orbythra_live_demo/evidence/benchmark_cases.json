@@ -1,0 +1,174 @@
+{
+  "suite": "ORBYTHRA bilingual universal-search acceptance benchmark",
+  "version": "2026-09-15.1",
+  "cases": [
+    {
+      "id": "tr-auto-001",
+      "lang": "tr",
+      "mode": "auto",
+      "query": "Cupra Formentor motoru nedir?",
+      "expect": ["non_empty_answer", "same_language", "model_year_trim_caveat", "technical_visual_state"]
+    },
+    {
+      "id": "en-eng-001",
+      "lang": "en",
+      "mode": "engineering",
+      "query": "How does a turbocharger wastegate work?",
+      "expect": ["non_empty_answer", "same_language", "technical_explanation", "technical_visual_state"]
+    },
+    {
+      "id": "tr-eng-002",
+      "lang": "tr",
+      "mode": "engineering",
+      "query": "DSG şanzıman ile tork konvertörlü otomatik şanzıman arasındaki fark nedir?",
+      "expect": ["comparison", "same_language", "no_blank"]
+    },
+    {
+      "id": "en-auto-002",
+      "lang": "en",
+      "mode": "auto",
+      "query": "What engines are available in the Cupra Formentor depending on model year and market?",
+      "expect": ["variant_awareness", "same_language", "no_single-engine_claim"]
+    },
+    {
+      "id": "tr-science-001",
+      "lang": "tr",
+      "mode": "science",
+      "query": "CRISPR-Cas9 nasıl çalışır?",
+      "expect": ["scientific_explanation", "sources_if_available", "same_language"]
+    },
+    {
+      "id": "en-science-002",
+      "lang": "en",
+      "mode": "science",
+      "query": "What is the difference between mRNA and DNA?",
+      "expect": ["scientific_explanation", "same_language"]
+    },
+    {
+      "id": "tr-history-001",
+      "lang": "tr",
+      "mode": "auto",
+      "query": "İzmir Saat Kulesi ne zaman ve neden yapıldı?",
+      "expect": ["historical_answer", "timeline_signal", "sources_if_available"]
+    },
+    {
+      "id": "en-history-002",
+      "lang": "en",
+      "mode": "auto",
+      "query": "Why did the Roman Empire split into eastern and western halves?",
+      "expect": ["historical_answer", "same_language"]
+    },
+    {
+      "id": "tr-world-001",
+      "lang": "tr",
+      "mode": "world",
+      "query": "Japonya'nın başkenti nedir ve nüfusu neden bu kadar yoğundur?",
+      "expect": ["factual_answer", "explanation", "same_language"]
+    },
+    {
+      "id": "en-world-002",
+      "lang": "en",
+      "mode": "world",
+      "query": "Why is the Suez Canal strategically important?",
+      "expect": ["geopolitical_context", "same_language"]
+    },
+    {
+      "id": "tr-tech-001",
+      "lang": "tr",
+      "mode": "auto",
+      "query": "NVIDIA GPU ile CPU arasındaki temel fark nedir?",
+      "expect": ["technical_comparison", "same_language"]
+    },
+    {
+      "id": "en-tech-002",
+      "lang": "en",
+      "mode": "auto",
+      "query": "Explain transformer attention in simple terms and then technically.",
+      "expect": ["two_level_explanation", "same_language"]
+    },
+    {
+      "id": "tr-current-001",
+      "lang": "tr",
+      "mode": "web",
+      "query": "Yapay zekâ çiplerinde güncel gelişmeler neler?",
+      "expect": ["freshness_caveat", "source_assisted", "no_fabricated_current_fact"]
+    },
+    {
+      "id": "en-current-002",
+      "lang": "en",
+      "mode": "web",
+      "query": "What are the latest developments in quantum computing?",
+      "expect": ["freshness_caveat", "source_assisted", "same_language"]
+    },
+    {
+      "id": "tr-med-001",
+      "lang": "tr",
+      "mode": "science",
+      "query": "Parasetamol ne işe yarar?",
+      "expect": ["general_medical_info", "safety_boundary", "same_language"]
+    },
+    {
+      "id": "en-med-002",
+      "lang": "en",
+      "mode": "science",
+      "query": "What does HbA1c measure?",
+      "expect": ["general_medical_info", "same_language"]
+    },
+    {
+      "id": "tr-code-001",
+      "lang": "tr",
+      "mode": "engineering",
+      "query": "REST API nedir, basit bir örnekle anlat.",
+      "expect": ["technical_answer", "example", "same_language"]
+    },
+    {
+      "id": "en-code-002",
+      "lang": "en",
+      "mode": "engineering",
+      "query": "What is idempotency in APIs and why does it matter?",
+      "expect": ["technical_answer", "same_language"]
+    },
+    {
+      "id": "tr-amb-001",
+      "lang": "tr",
+      "mode": "auto",
+      "query": "Formentor 310 motor ne?",
+      "expect": ["ambiguity_resolution_without_blank", "automotive_context", "same_language"]
+    },
+    {
+      "id": "en-amb-002",
+      "lang": "en",
+      "mode": "auto",
+      "query": "Tell me about Mercury.",
+      "expect": ["ambiguity_awareness", "useful_answer_or_disambiguation"]
+    },
+    {
+      "id": "tr-no-source-001",
+      "lang": "tr",
+      "mode": "auto",
+      "query": "Bir turbo motor neden atmosferik motordan daha fazla tork üretebilir?",
+      "expect": ["model_knowledge_fallback", "same_language", "no_blank"]
+    },
+    {
+      "id": "en-no-source-002",
+      "lang": "en",
+      "mode": "auto",
+      "query": "Why can a turbocharged engine make more torque than a naturally aspirated engine?",
+      "expect": ["model_knowledge_fallback", "same_language", "no_blank"]
+    },
+    {
+      "id": "tr-visual-001",
+      "lang": "tr",
+      "mode": "engineering",
+      "query": "Dört zamanlı motorun çalışma prensibini teknik resimlerle anlat.",
+      "expect": ["technical_visual_state", "technical_explanation", "same_language"]
+    },
+    {
+      "id": "en-visual-002",
+      "lang": "en",
+      "mode": "engineering",
+      "query": "Explain a four-stroke engine with technical diagrams.",
+      "expect": ["technical_visual_state", "technical_explanation", "same_language"]
+    }
+  ]
+}
