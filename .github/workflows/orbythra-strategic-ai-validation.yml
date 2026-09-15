@@ -6,6 +6,7 @@ on:
     paths:
       - ".github/workflows/orbythra-strategic-ai-validation.yml"
       - "osiris_ai_fusion/benchmarks/strategic_ai_validation_v1.json"
+      - "osiris_ai_fusion/run_strategic_validation.py"
       - "osiris_ai_fusion/run_adaptive_benchmark.py"
   workflow_dispatch:
   schedule:
@@ -24,7 +25,6 @@ jobs:
     timeout-minutes: 25
     env:
       ORBYTHRA_BENCHMARK_BASE_URL: "https://orbythra-adaptive-core-llftzg.v2.appdeploy.ai"
-      ORBYTHRA_BENCHMARK_API_PATH: "/api/investigate"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -46,9 +46,8 @@ jobs:
         continue-on-error: true
         run: |
           set +e
-          python run_adaptive_benchmark.py \
+          python run_strategic_validation.py \
             --base-url "$ORBYTHRA_BENCHMARK_BASE_URL" \
-            --api-path "$ORBYTHRA_BENCHMARK_API_PATH" \
             --suite benchmarks/strategic_ai_validation_v1.json \
             --timeout 180 \
             --output ../dist/strategic-ai-validation/result.json
@@ -90,19 +89,16 @@ jobs:
               "",
               "## Claim boundary",
               "",
-              "This is a first-party live production benchmark. It is not an independent OpenAI, Anthropic, academic, security, or AGI certification. It measures the published structural contract of ORBYTHRA against the live endpoint.",
+              str(r.get("claim_boundary") or "First-party production benchmark only."),
               "",
               "## Cases",
               "",
           ]
           for case in r.get("results", []):
-              if case.get("skipped"):
-                  lines.append(f"- `{case.get('id')}` — SKIPPED: {case.get('reason')}")
-              else:
-                  status = "PASS" if case.get("passed") else "FAIL"
-                  lines.append(
-                      f"- `{case.get('id')}` — **{status}**, score={case.get('score')}, latency={case.get('latency_ms')} ms"
-                  )
+              status = "PASS" if case.get("passed") else "FAIL"
+              lines.append(
+                  f"- `{case.get('id')}` — **{status}**, score={case.get('score')}, latency={case.get('latency_ms')} ms"
+              )
           out.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
           github_summary = os.getenv("GITHUB_STEP_SUMMARY")
