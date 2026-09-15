@@ -60,9 +60,8 @@ def _scope(auth: AuthContext, *, goal_id: str | None = None) -> dict[str, Any]:
     return scope
 
 
-def _learn(auth: AuthContext, result: dict[str, Any]) -> dict[str, Any]:
+def _learning_snapshot(auth: AuthContext, result: dict[str, Any]) -> dict[str, Any]:
     evaluation = result.get("self_evaluation") or {}
-    policy = autonomy_store.observe_evaluation(auth.tenant_id, evaluation)
     autonomy_store.record_telemetry(
         auth.tenant_id,
         "investigation",
@@ -72,7 +71,7 @@ def _learn(auth: AuthContext, result: dict[str, Any]) -> dict[str, Any]:
             "refined": bool((result.get("adaptation") or {}).get("performed")),
         },
     )
-    return policy
+    return autonomy_store.get_learning_policy(auth.tenant_id)
 
 
 @router.get("")
@@ -148,7 +147,7 @@ async def run_goal(goal_id: str, auth: Identity) -> dict[str, Any]:
     if goal["status"] not in {"active", "review"}:
         raise HTTPException(status_code=409, detail="Goal is not runnable in its current state")
     result = await investigate(goal["objective"], scope=_scope(auth, goal_id=goal_id))
-    policy = _learn(auth, result)
+    policy = _learning_snapshot(auth, result)
     updated_goal = autonomy_store.record_goal_run(goal_id, auth.tenant_id, result)
     return {
         "goal": updated_goal,
@@ -223,7 +222,7 @@ async def execute_action(action_id: str, auth: Identity) -> dict[str, Any]:
             query,
             scope=_scope(auth, goal_id=action.get("goal_id")),
         )
-        policy = _learn(auth, result)
+        policy = _learning_snapshot(auth, result)
         return autonomy_store.finish_action(
             action_id,
             auth.tenant_id,
