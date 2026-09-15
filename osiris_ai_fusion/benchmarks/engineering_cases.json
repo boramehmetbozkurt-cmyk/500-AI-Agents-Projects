@@ -1,0 +1,42 @@
+{
+  "schema": "orbythra.engineering-benchmark.v1",
+  "rights": "Original synthetic cases authored for ORBYTHRA; no third-party case text copied.",
+  "external_validation": false,
+  "cases": [
+    {
+      "id": "thermal-enclosure-01",
+      "domain": "thermal_mechanical",
+      "problem": "A sealed electronics enclosure dissipates 42 W continuously in 35 C ambient. Internal component temperature must remain below 85 C without a fan.",
+      "required_topics": ["thermal resistance", "conduction", "convection", "radiation", "interface", "FMEA", "verification"],
+      "unknowns": ["enclosure dimensions", "material", "surface emissivity", "component contact area"]
+    },
+    {
+      "id": "pump-cavitation-01",
+      "domain": "fluid_mechanical",
+      "problem": "A centrifugal pump intermittently cavitates after process temperature rises while required flow remains constant.",
+      "required_topics": ["NPSH", "vapor pressure", "suction losses", "alternative", "FMEA", "verification"],
+      "unknowns": ["fluid", "temperature", "suction elevation", "pipe losses", "pump curve"]
+    },
+    {
+      "id": "bracket-vibration-01",
+      "domain": "structural_dynamics",
+      "problem": "A lightweight sensor bracket cracks near its mounting holes after repeated machine vibration. Mass increase must stay below 8 percent.",
+      "required_topics": ["stress concentration", "fatigue", "natural frequency", "damping", "FMEA", "verification"],
+      "unknowns": ["load spectrum", "material", "geometry", "fastener preload"]
+    },
+    {
+      "id": "battery-enclosure-01",
+      "domain": "electrical_thermal_safety",
+      "problem": "Design a passive containment concept for a small battery module while minimizing mass and preventing a single-cell thermal event from directly heating adjacent cells.",
+      "required_topics": ["thermal propagation", "barrier", "venting", "electrical isolation", "FMEA", "verification"],
+      "unknowns": ["cell chemistry", "cell energy", "module geometry", "applicable certification standard"]
+    },
+    {
+      "id": "filter-pressure-drop-01",
+      "domain": "fluid_process",
+      "problem": "A water filtration stage must double contaminant capture capacity without increasing clean-filter pressure drop by more than 15 percent.",
+      "required_topics": ["porosity", "surface area", "pressure drop", "fouling", "alternative", "FMEA", "verification"],
+      "unknowns": ["particle distribution", "viscosity", "flow rate", "current media geometry"]
+    }
+  ]
+}

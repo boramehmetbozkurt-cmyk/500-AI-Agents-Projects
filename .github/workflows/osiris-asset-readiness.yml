@@ -1,0 +1,133 @@
+name: ORBYTHRA Asset Readiness
+
+on:
+  pull_request:
+    paths:
+      - "osiris_ai_fusion/**"
+      - ".github/workflows/osiris-asset-readiness.yml"
+  push:
+    branches:
+      - main
+      - osiris-fusion-v1-release
+    paths:
+      - "osiris_ai_fusion/**"
+      - ".github/workflows/osiris-asset-readiness.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  buyer-dataroom:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: osiris_ai_fusion
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: |
+            osiris_ai_fusion/requirements.txt
+            osiris_ai_fusion/requirements-dev.txt
+      - name: Install resolved runtime
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+          pip check
+      - name: Build buyer artifacts
+        env:
+          SEAL_ED25519_PRIVATE_KEY_B64: ${{ secrets.SEAL_ED25519_PRIVATE_KEY_B64 }}
+        run: |
+          python scripts/build_buyer_artifacts.py --output dist/buyer-dataroom
+          python scripts/build_asset_carveout.py --output dist/buyer-dataroom > dist/buyer-dataroom/carveout-build-receipt.json
+          python ops_benchmark.py --scientists 250 --works 250 --output dist/buyer-dataroom/orbythra-core-benchmark.json > /dev/null
+          python ops_resolution_benchmark.py --output dist/buyer-dataroom/orbythra-science-resolution-benchmark.json > /dev/null
+          python ops_load_benchmark.py --requests 100 --concurrency 10 --output dist/buyer-dataroom/orbythra-load-baseline.json > /dev/null
+          python scripts/bootstrap_buyer_demo.py --output dist/buyer-dataroom/buyer-demo > /dev/null
+          cp -R legal dist/buyer-dataroom/legal
+          cp -R enterprise dist/buyer-dataroom/enterprise
+          cp -R benchmarks dist/buyer-dataroom/benchmarks
+          git -C .. log --date=iso-strict --pretty=format:'%H%x09%aI%x09%an%x09%ae%x09%s' -- osiris_ai_fusion > dist/buyer-dataroom/orbythra-path-git-provenance.tsv
+          git -C .. diff --stat main...HEAD -- osiris_ai_fusion > dist/buyer-dataroom/orbythra-vs-main-diffstat.txt || true
+          python ops_attestation.py \
+            --output dist/buyer-dataroom/orbythra-release-attestation.json \
+            dist/buyer-dataroom/orbythra-asset-manifest.json \
+            dist/buyer-dataroom/orbythra-python-sbom.spdx.json \
+            dist/buyer-dataroom/orbythra-core-benchmark.json \
+            dist/buyer-dataroom/orbythra-science-resolution-benchmark.json \
+            dist/buyer-dataroom/orbythra-load-baseline.json > /dev/null
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          root = Path("dist/buyer-dataroom")
+          asset = json.loads((root / "orbythra-asset-manifest.json").read_text())
+          sbom = json.loads((root / "orbythra-python-sbom.spdx.json").read_text())
+          rights = json.loads((root / "orbythra-data-rights.json").read_text())
+          benchmark = json.loads((root / "orbythra-core-benchmark.json").read_text())
+          resolution = json.loads((root / "orbythra-science-resolution-benchmark.json").read_text())
+          load = json.loads((root / "orbythra-load-baseline.json").read_text())
+          demo = json.loads((root / "buyer-demo" / "demo-manifest.json").read_text())
+          attestation = json.loads((root / "orbythra-release-attestation.json").read_text())
+          carveout_receipts = list(root.glob("orbythra-v1.3-carveout-*.receipt.json"))
+          archives = list(root.glob("orbythra-v1.3-carveout-*.zip"))
+          legal_required = [
+              "legal/LEGAL_DUE_DILIGENCE.md",
+              "legal/IP_OWNERSHIP_SCHEDULE.md",
+              "legal/THIRD_PARTY_LICENSE_MATRIX.md",
+              "legal/PRIVACY_KVKK_GDPR_POLICY.md",
+              "legal/AI_ACT_COMPLIANCE.md",
+              "legal/TERMS_OF_USE_DRAFT.md",
+              "legal/PROFESSIONAL_USE_DISCLAIMERS.md",
+              "legal/TRADEMARK_CLEARANCE.md",
+              "legal/CLEAN_IP_CARVEOUT_PLAN.md",
+              "legal/DPA_TEMPLATE.md",
+          ]
+          assert asset["schema"] == "orbythra.asset-manifest.v1"
+          assert asset["file_count"] > 0
+          assert asset["root_license"]["present"] is True
+          assert asset["engineering_intelligence"]["prompt_version"] == "2.0"
+          assert sbom["spdxVersion"] == "SPDX-2.3"
+          assert "ORBYTHRA" in sbom["name"]
+          assert len(sbom["packages"]) > 0
+          assert len(rights["sources"]) >= 6
+          assert benchmark["synthetic"] is True
+          assert benchmark["entity_ingest"]["written"] == 500
+          assert benchmark["relationship_rebuild"]["edges_written"] > 0
+          assert benchmark["world_bridge"]["entity_events_created"] == 500
+          assert resolution["independent_external_validation"] is False
+          assert resolution["overall"]["cases"] >= 10
+          assert resolution["overall"]["accuracy"] == 1.0
+          assert load["synthetic_local_asgi"] is True
+          assert load["production_measurement"] is False
+          assert load["success_rate"] == 1.0
+          assert demo["schema"] == "orbythra.buyer-demo.v1"
+          assert demo["requires_external_secrets"] is False
+          assert demo["network_required_for_seed"] is False
+          assert attestation["subject"]["schema"] == "orbythra.release-attestation.v1"
+          assert attestation["subject"]["git_sha"] != "unknown"
+          assert attestation["subject"]["files"]
+          if not attestation["signature"]["signed"]:
+              assert attestation["signature"]["reason"]
+          assert len(carveout_receipts) == 1
+          assert len(archives) == 1
+          assert (root / "orbythra-path-git-provenance.tsv").stat().st_size > 0
+          assert (root / "enterprise" / "ENTERPRISE_READINESS_PACK.md").stat().st_size > 500
+          assert (root / "enterprise" / "OPS_EVIDENCE_RUNBOOK.md").stat().st_size > 500
+          for legal_path in legal_required:
+              path = Path(legal_path)
+              assert path.is_file(), f"missing legal due-diligence artifact: {legal_path}"
+              assert path.stat().st_size > 200, f"legal artifact unexpectedly small: {legal_path}"
+          PY
+          python -m pip list --format=json > dist/buyer-dataroom/resolved-python-packages.json
+      - name: Upload buyer data-room artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: orbythra-buyer-dataroom-${{ github.sha }}
+          path: osiris_ai_fusion/dist/buyer-dataroom
+          if-no-files-found: error
+          retention-days: 30

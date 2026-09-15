@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <meta name="description" content="ORBYTHRA Science Genome Graph — scientists, scholarship, genes, proteins and public genomic reference knowledge">
+  <title>ORBYTHRA Science Genome Graph</title>
+  <link rel="stylesheet" href="/assets/science-explorer.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/app"><span class="mark">O</span><span><strong>ORBYTHRA</strong><small>SCIENCE GENOME GRAPH</small></span></a>
+    <nav>
+      <a href="/world-globe">Temporal Globe</a>
+      <a href="/atlas">Fusion Atlas</a>
+      <a href="/engineering-lab">Engineering</a>
+      <a href="/app">Command Center</a>
+      <button id="accessBtn" class="ghost" type="button">ACCESS</button>
+    </nav>
+  </header>
+
+  <main class="shell">
+    <section class="hero panel">
+      <div>
+        <span class="eyebrow">EVIDENCE · IDENTIFIERS · RELEASE PROVENANCE</span>
+        <h1>Bilim insanından DNA'ya <span>tek doğrulanabilir graf.</span></h1>
+        <p>OpenAlex, Wikidata, NCBI, Ensembl, UniProt ve ClinVar kaynaklarını aynı veri gibi göstermeden; kaynak, kimlik, assembly/release ve hak sınırlarını koruyarak gez.</p>
+      </div>
+      <div id="stats" class="stats"><div><strong>—</strong><span>ENTITIES</span></div><div><strong>—</strong><span>EDGES</span></div><div><strong>6</strong><span>SOURCES</span></div></div>
+    </section>
+
+    <section class="panel search-panel">
+      <div id="modes" class="tabs" role="tablist"><button type="button" data-mode="scientists" class="active">SCIENTISTS</button><button type="button" data-mode="works">WORKS</button><button type="button" data-mode="gene">GENE / DNA</button><button type="button" data-mode="protein">PROTEIN</button><button type="button" data-mode="variant">VARIANT</button></div>
+      <form id="searchForm" class="search-row"><input id="query" autocomplete="off" maxlength="300" placeholder="Einstein, CRISPR, BRCA2, TP53, rs..., cancer genomics..." required><button class="primary" type="submit">SEARCH LIVE SOURCES</button><button id="ingestBtn" class="secondary" type="button" disabled>INGEST QUERY</button></form>
+      <div id="sourceStrip" class="source-strip"></div>
+      <div class="boundary">Shared graph = public reference science only. Personal VCF/BAM/CRAM/FASTQ and identifiable patient genetics are rejected from this data plane.</div>
+    </section>
+
+    <section class="workspace">
+      <article class="panel results-panel"><div class="panel-head"><div><small>LIVE RESULTS</small><h2 id="resultsTitle">Scientist search</h2></div><span id="resultCount" class="badge">0</span></div><div id="results" class="results empty">Bir sorgu çalıştır.</div></article>
+      <aside class="panel detail-panel"><div class="panel-head"><div><small>SELECTED ENTITY</small><h2 id="detailTitle">Bir sonuç seç</h2></div><span id="detailSource" class="badge muted">—</span></div><p id="detailSummary">Kaynak kimlikleri, bilimsel metadata ve genom referans alanları burada görünür.</p><div id="detailMeta" class="detail-meta"></div><pre id="detailJson" class="jsonbox">{}</pre></aside>
+    </section>
+
+    <section class="panel graph-panel">
+      <div class="panel-head"><div><small>TENANT KNOWLEDGE GRAPH</small><h2>Scientists ↔ Works ↔ Genes ↔ Proteins ↔ Variants</h2></div><div class="actions"><button id="rebuildGraph" class="secondary" type="button">REBUILD EDGES</button><button id="refreshGraph" class="ghost" type="button">REFRESH GRAPH</button></div></div>
+      <div class="graph-wrap"><svg id="graph" viewBox="0 0 1400 620" role="img" aria-label="Science Genome relationship graph"></svg></div>
+      <div id="graphNote" class="graph-note">Ingest edilen public-reference kayıtları ORBYTHRA tenant graph'ında görünür.</div>
+    </section>
+
+    <section class="panel source-panel"><div class="panel-head"><div><small>DATA RIGHTS</small><h2>Kaynak hakları otomatik kaybolmaz.</h2></div><span id="apiStatus" class="badge muted">AUTH —</span></div><div id="sourceCards" class="source-cards"></div></section>
+  </main>
+
+  <dialog id="accessDialog"><form method="dialog" class="dialog-card"><div class="panel-head"><h2>ORBYTHRA Science Graph Access</h2><button class="ghost" value="cancel">CLOSE</button></div><label>ORBYTHRA API key<input id="apiKeyInput" type="password" autocomplete="off" placeholder="X-API-Key"></label><p>Anahtar yalnız bu sekmenin sessionStorage alanında tutulur.</p><button id="saveAccess" class="primary" value="default">SAVE & CONNECT</button></form></dialog>
+
+  <script src="/assets/science-explorer.js" defer></script>
+</body>
+</html>

@@ -27,30 +27,27 @@ def make_evidence_record(
     data: Any | None = None,
     error: str | None = None,
 ) -> dict[str, Any]:
+    fetched_at = int(time.time())
+    evidence_id = "ev_" + hashlib.sha256(
+        f"{tool}|{source_url}|{fetched_at}".encode("utf-8")
+    ).hexdigest()[:16]
     body = {
+        "evidence_id": evidence_id,
         "tool": tool,
         "source_url": source_url,
-        "fetched_at": int(time.time()),
+        "fetched_at": fetched_at,
         "ok": error is None,
         "data": data if error is None else None,
         "error": error,
     }
-    body["digest"] = sha256_hex(
-        {
-            "tool": body["tool"],
-            "source_url": body["source_url"],
-            "fetched_at": body["fetched_at"],
-            "ok": body["ok"],
-            "data": body["data"],
-            "error": body["error"],
-        }
-    )
+    body["digest"] = sha256_hex(body)
     return body
 
 
 def evidence_bundle_digest(evidence: dict[str, Any]) -> str:
     stable = {
         key: {
+            "evidence_id": value.get("evidence_id"),
             "tool": value.get("tool"),
             "source_url": value.get("source_url"),
             "fetched_at": value.get("fetched_at"),
@@ -66,10 +63,7 @@ def confidence_from_evidence(evidence: dict[str, Any]) -> dict[str, Any]:
     total = len(evidence)
     successes = sum(1 for value in evidence.values() if value.get("ok") is True)
     failures = total - successes
-    if total == 0:
-        score = 0.0
-    else:
-        score = round(successes / total, 3)
+    score = round(successes / total, 3) if total else 0.0
     label = "high" if score >= 0.8 else "medium" if score >= 0.5 else "low"
     return {
         "score": score,
@@ -77,5 +71,20 @@ def confidence_from_evidence(evidence: dict[str, Any]) -> dict[str, Any]:
         "successful_sources": successes,
         "failed_sources": failures,
         "total_sources": total,
-        "method": "availability-only; analytical confidence must still be stated by the model",
+        "method": "source-availability score; claim confidence is reported separately",
     }
+
+
+def public_evidence_index(evidence: dict[str, Any]) -> list[dict[str, Any]]:
+    return [
+        {
+            "evidence_id": record.get("evidence_id"),
+            "tool": record.get("tool"),
+            "source_url": record.get("source_url"),
+            "fetched_at": record.get("fetched_at"),
+            "ok": record.get("ok"),
+            "digest": record.get("digest"),
+            "error": record.get("error"),
+        }
+        for record in evidence.values()
+    ]

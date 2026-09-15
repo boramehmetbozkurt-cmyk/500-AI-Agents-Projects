@@ -6,6 +6,7 @@ import os
 import sqlite3
 import time
 import unicodedata
+import uuid
 from dataclasses import asdict, dataclass
 from decimal import Decimal, InvalidOperation
 from typing import Any
@@ -17,8 +18,8 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey,
 from config import get_settings
 from provenance import sha256_hex
 
-INTENT_DOMAIN = b"OSIRIS-SEAL-INTENT-V2"
-RECEIPT_DOMAIN = b"OSIRIS-SEAL-RECEIPT-V2"
+INTENT_DOMAIN = b"OSIRIS-SEAL-INTENT-V3"
+RECEIPT_DOMAIN = b"OSIRIS-SEAL-RECEIPT-V3"
 
 
 def _norm_text(value: str) -> str:
@@ -27,23 +28,23 @@ def _norm_text(value: str) -> str:
 
 def _canon_decimal(value: Any) -> str:
     try:
-        d = Decimal(str(value))
+        decimal = Decimal(str(value))
     except (InvalidOperation, ValueError) as exc:
         raise ValueError(f"Invalid decimal value: {value!r}") from exc
-    s = format(d.normalize(), "f")
-    if "." in s:
-        s = s.rstrip("0").rstrip(".")
-    return s or "0"
+    result = format(decimal.normalize(), "f")
+    if "." in result:
+        result = result.rstrip("0").rstrip(".")
+    return result or "0"
 
 
 def _canon(value: Any) -> Any:
     if isinstance(value, dict):
         return {
-            str(k).lower(): _canon(v)
-            for k, v in sorted(value.items(), key=lambda kv: str(kv[0]).lower())
+            str(key).lower(): _canon(item)
+            for key, item in sorted(value.items(), key=lambda pair: str(pair[0]).lower())
         }
     if isinstance(value, list):
-        return [_canon(v) for v in value]
+        return [_canon(item) for item in value]
     if isinstance(value, str):
         return _norm_text(value)
     if isinstance(value, float):
@@ -87,8 +88,7 @@ class ReplayGuard:
     def _init_db(self) -> None:
         with self._connect() as conn:
             conn.execute(
-                "CREATE TABLE IF NOT EXISTS seal_nonces ("
-                "nonce TEXT PRIMARY KEY, expires_at INTEGER NOT NULL)"
+                "CREATE TABLE IF NOT EXISTS seal_nonces (nonce TEXT PRIMARY KEY, expires_at INTEGER NOT NULL)"
             )
             conn.commit()
 
@@ -97,42 +97,34 @@ class ReplayGuard:
         with self._connect() as conn:
             conn.execute("DELETE FROM seal_nonces WHERE expires_at < ?", (now,))
             try:
-                conn.execute(
-                    "INSERT INTO seal_nonces(nonce, expires_at) VALUES (?, ?)",
-                    (nonce, expires_at),
-                )
+                conn.execute("INSERT INTO seal_nonces(nonce, expires_at) VALUES (?, ?)", (nonce, expires_at))
                 conn.commit()
             except sqlite3.IntegrityError as exc:
                 raise PermissionError("Replay detected: nonce already consumed") from exc
 
 
-def seal_intent(
-    query: str,
-    allowed_tools: list[str],
-    scope: dict[str, Any] | None = None,
-    ttl_seconds: int | None = None,
-) -> SealedIntent:
+def seal_intent(query: str, allowed_tools: list[str], scope: dict[str, Any] | None = None, ttl_seconds: int | None = None) -> SealedIntent:
     settings = get_settings()
     ttl = ttl_seconds or settings.seal_ttl_seconds
     now = int(time.time())
     nonce = os.urandom(16).hex()
     normalized_query = _norm_text(query)
-    tools = sorted(set(t.lower() for t in allowed_tools))
+    tools = sorted(set(tool.lower() for tool in allowed_tools))
     normalized_scope = _canon(scope or {})
     expected_effect = {
         "read_only": True,
         "max_tool_calls": min(settings.max_tool_calls, len(tools)),
         "allowed_tools": tools,
+        "active_routes": "denied",
+        "evidence_binding_required": True,
     }
-    intent_id = hashlib.sha256(
-        f"{normalized_query}|{nonce}|{now}".encode()
-    ).hexdigest()[:24]
+    intent_id = "intent_" + uuid.uuid4().hex[:20]
     human = (
-        f"Query={normalized_query}; tools={','.join(tools)}; "
-        f"read_only=true; max_tool_calls={expected_effect['max_tool_calls']}"
+        f"Query={normalized_query}; tools={','.join(tools)}; read_only=true; "
+        f"max_tool_calls={expected_effect['max_tool_calls']}; active_routes=denied"
     )
     return SealedIntent(
-        schema_version=2,
+        schema_version=3,
         intent_id=intent_id,
         query=normalized_query,
         allowed_tools=tools,
@@ -145,15 +137,11 @@ def seal_intent(
     )
 
 
-def authorize_execution(
-    intent: SealedIntent,
-    requested_tools: list[str],
-    replay_guard: ReplayGuard | None = None,
-) -> None:
+def authorize_execution(intent: SealedIntent, requested_tools: list[str], replay_guard: ReplayGuard | None = None) -> None:
     now = int(time.time())
     if now > intent.expires_at:
         raise PermissionError("Intent expired")
-    tools = sorted(set(t.lower() for t in requested_tools))
+    tools = sorted(set(tool.lower() for tool in requested_tools))
     unauthorized = [tool for tool in tools if tool not in intent.allowed_tools]
     if unauthorized:
         raise PermissionError(f"Unauthorized tools requested: {unauthorized}")
@@ -174,26 +162,18 @@ def _load_private_key() -> Ed25519PrivateKey | None:
 
 def _receipt_signing_bytes(receipt: dict[str, Any]) -> bytes:
     payload = cbor2.dumps(_canon(receipt), canonical=True)
-    return (
-        len(RECEIPT_DOMAIN).to_bytes(8, "big")
-        + RECEIPT_DOMAIN
-        + len(payload).to_bytes(8, "big")
-        + payload
-    )
+    return len(RECEIPT_DOMAIN).to_bytes(8, "big") + RECEIPT_DOMAIN + len(payload).to_bytes(8, "big") + payload
 
 
-def sign_receipt(
-    intent: SealedIntent,
-    executed_tools: list[str],
-    effect_summary: str,
-    evidence_digest: str,
-) -> dict[str, Any]:
+def sign_receipt(intent: SealedIntent, executed_tools: list[str], effect_summary: str, evidence_digest: str) -> dict[str, Any]:
     if int(time.time()) > intent.expires_at:
         raise PermissionError("Intent expired")
-    executed = sorted(set(t.lower() for t in executed_tools))
+    executed = sorted(set(tool.lower() for tool in executed_tools))
     unauthorized = [tool for tool in executed if tool not in intent.allowed_tools]
     if unauthorized:
         raise PermissionError(f"Unauthorized tools executed: {unauthorized}")
+    if not evidence_digest:
+        raise PermissionError("Evidence digest is required for a verified receipt")
 
     actual_effect = {
         "read_only": True,
@@ -201,14 +181,17 @@ def sign_receipt(
         "tool_call_count": len(executed),
         "evidence_digest": evidence_digest,
         "analysis_digest": sha256_hex(_norm_text(effect_summary)),
+        "active_routes_used": False,
     }
     bounded_match = (
         actual_effect["read_only"] is True
+        and actual_effect["active_routes_used"] is False
         and len(executed) <= int(intent.expected_effect["max_tool_calls"])
         and not unauthorized
     )
     receipt: dict[str, Any] = {
-        "schema_version": 2,
+        "schema_version": 3,
+        "receipt_id": "receipt_" + uuid.uuid4().hex[:20],
         "intent_id": intent.intent_id,
         "intent_digest": intent.digest(),
         "scope": intent.scope,
@@ -218,7 +201,7 @@ def sign_receipt(
         "verified_at": int(time.time()),
         "policy_check": "PASS" if bounded_match else "FAIL",
         "effect_match": "BOUNDED_PASS" if bounded_match else "FAIL",
-        "verification_model": "tool-scope + read-only effect + evidence binding",
+        "verification_model": "tool-scope + read-only effect + evidence binding + replay guard",
         "signature_alg": None,
         "public_key_b64": None,
         "signature_b64": None,
@@ -232,10 +215,9 @@ def sign_receipt(
         )
         receipt["signature_alg"] = "Ed25519"
         receipt["public_key_b64"] = base64.b64encode(public_key).decode("ascii")
-        unsigned = {k: v for k, v in receipt.items() if k != "signature_b64"}
-        receipt["signature_b64"] = base64.b64encode(
-            private_key.sign(_receipt_signing_bytes(unsigned))
-        ).decode("ascii")
+        unsigned = {key: value for key, value in receipt.items() if key != "signature_b64"}
+        signature = private_key.sign(_receipt_signing_bytes(unsigned))
+        receipt["signature_b64"] = base64.b64encode(signature).decode("ascii")
     elif get_settings().require_signed_receipts:
         raise RuntimeError("Signed receipts are required but no SEAL Ed25519 key is configured")
 
@@ -247,13 +229,14 @@ def verify_receipt(receipt: dict[str, Any]) -> bool:
     public_key_b64 = receipt.get("public_key_b64")
     if not signature_b64 or not public_key_b64:
         return False
-    unsigned = {k: v for k, v in receipt.items() if k != "signature_b64"}
-    public_key = Ed25519PublicKey.from_public_bytes(base64.b64decode(public_key_b64))
+    unsigned = {key: value for key, value in receipt.items() if key != "signature_b64"}
     try:
-        public_key.verify(
-            base64.b64decode(signature_b64),
-            _receipt_signing_bytes(unsigned),
-        )
+        raw_public_key = base64.b64decode(public_key_b64, validate=True)
+        if len(raw_public_key) != 32:
+            return False
+        public_key = Ed25519PublicKey.from_public_bytes(raw_public_key)
+        signature = base64.b64decode(signature_b64, validate=True)
+        public_key.verify(signature, _receipt_signing_bytes(unsigned))
         return True
     except Exception:
         return False

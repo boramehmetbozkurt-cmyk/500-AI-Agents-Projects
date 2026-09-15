@@ -1,0 +1,20 @@
+{
+  "name": "calculator",
+  "domain": "calculation",
+  "description": "Deterministic local arithmetic evaluator with conservative intent matching.",
+  "kind": "local_calculator",
+  "read_only": true,
+  "auto_execute": true,
+  "keywords": [
+    "hesapla",
+    "kaç eder",
+    "calculate",
+    " + ",
+    " * ",
+    " / ",
+    " % ",
+    " × ",
+    " ÷ "
+  ],
+  "provider": "local"
+}

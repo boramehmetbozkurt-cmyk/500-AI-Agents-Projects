@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="dark" />
+  <title>ORBYTHRA — Universal Search</title>
+  <meta name="description" content="ORBYTHRA evidence-first universal search and temporal reality intelligence." />
+  <link rel="preconnect" href="https://unpkg.com" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="/assets/styles.css" />
+</head>
+<body>
+  <div class="scanline" aria-hidden="true"></div>
+  <header class="topbar">
+    <div class="brand"><div class="brand-mark">O</div><div><strong>ORBYTHRA</strong><span>Verifiable Temporal Reality Operating System</span></div></div>
+    <div class="top-actions"><span id="connectionBadge" class="badge muted">BACKEND: CHECKING</span><button id="settingsBtn" class="ghost" type="button">ACCESS</button></div>
+    <nav class="orbythra-mode-nav"><a href="/atlas">ATLAS</a> · <a href="/world-globe">GLOBE</a> · <a href="/science-explorer">SCIENCE</a> · <a href="/engineering-lab">ENGINEERING</a></nav>
+  </header>
+
+  <main class="shell">
+    <section class="hero panel">
+      <div class="eyebrow">UNIVERSAL SEARCH · EVIDENCE-BOUND · SOURCE-AWARE</div>
+      <h1>Ask ORBYTHRA anything.</h1>
+      <p>Bir şey yaz. ORBYTHRA önce doğrudan cevabı verir; ardından kaynakları, claim'leri, güven düzeyini, korelasyonları, haritayı ve doğrulama makbuzunu gösterir.</p>
+      <form id="queryForm" class="query-form">
+        <textarea id="queryInput" maxlength="2000" rows="3" placeholder="Örn: NVIDIA son üç yılda yapay zekâ tarafında ne yaptı, hangi şirketlerle rekabet ediyor ve bundan sonra ne olabilir?" required></textarea>
+        <div class="query-controls">
+          <input id="regionInput" maxlength="200" placeholder="Bölge (opsiyonel)" />
+          <select id="timeRangeInput" aria-label="Zaman aralığı"><option value="PT6H">Son 6 saat</option><option value="PT12H">Son 12 saat</option><option value="PT24H">Son 24 saat</option><option value="P7D">Son 7 gün</option><option value="P30D" selected>Son 30 gün</option></select>
+          <label class="toggle"><input id="saveInput" type="checkbox" checked /> <span>History</span></label>
+          <button id="runBtn" type="submit" class="primary">ASK ORBYTHRA</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="status-strip panel" aria-live="polite">
+      <div class="stage active" data-stage="plan"><span>01</span><b>PLAN</b></div><div class="stage" data-stage="evidence"><span>02</span><b>SEARCH</b></div><div class="stage" data-stage="correlation"><span>03</span><b>RELATE</b></div><div class="stage" data-stage="analysis"><span>04</span><b>ANSWER</b></div><div class="stage" data-stage="receipt"><span>05</span><b>VERIFY</b></div><div class="stage" data-stage="complete"><span>06</span><b>COMPLETE</b></div>
+    </section>
+
+    <section class="panel report-panel">
+      <div class="panel-head"><h2>ORBYTHRA Answer</h2><span id="confidenceBadge" class="badge muted">CONFIDENCE —</span></div>
+      <div id="bluf" class="bluf empty">Sorunu yaz. Kaynaklara dayalı doğrudan cevap burada görünecek.</div>
+      <div id="claims" class="claims"></div>
+    </section>
+
+    <section class="grid two">
+      <article class="panel"><div class="panel-head"><h2>Sources</h2><span id="evidenceCount" class="badge">0 SOURCES</span></div><div id="evidenceView" class="stack empty">Henüz kaynak yok.</div></article>
+      <article class="panel map-panel"><div class="panel-head"><h2>Map / Spatial Evidence</h2><span id="markerCount" class="badge">0 MARKERS</span></div><div id="map" role="region" aria-label="Investigation map"></div></article>
+    </section>
+
+    <section class="grid two">
+      <article class="panel"><div class="panel-head"><h2>Related Signals</h2><span id="correlationCount" class="badge">0 CANDIDATES</span></div><div id="correlationView" class="stack empty">Henüz ilişki/korelasyon adayı yok.</div></article>
+      <article class="panel"><div class="panel-head"><h2>Search Plan</h2><span id="plannerModel" class="micro">—</span></div><pre id="planView" class="codebox">Henüz plan yok.</pre></article>
+    </section>
+
+    <section class="grid two">
+      <article class="panel"><div class="panel-head"><h2>Verification Receipt</h2><span id="sealBadge" class="badge muted">PENDING</span></div><pre id="receiptView" class="codebox">Henüz doğrulama makbuzu yok.</pre></article>
+      <article class="panel"><div class="panel-head"><h2>System / Source Policy</h2><button id="refreshSystemBtn" class="ghost small" type="button">REFRESH</button></div><div id="systemView" class="stack">Kontrol ediliyor…</div></article>
+    </section>
+
+    <section class="panel"><div class="panel-head"><h2>Technical Event Log</h2><button id="clearLogBtn" class="ghost small" type="button">CLEAR</button></div><pre id="eventLog" class="codebox log">Ready.</pre></section>
+  </main>
+
+  <dialog id="settingsDialog"><form method="dialog" class="dialog-card"><div class="panel-head"><h2>Access Settings</h2><button class="ghost small" value="cancel">CLOSE</button></div><label>ORBYTHRA API key<input id="apiKeyInput" type="password" autocomplete="off" placeholder="X-API-Key (production only)" /></label><p class="micro">Anahtar yalnızca bu tarayıcı sekmesinin sessionStorage alanında tutulur.</p><button id="saveSettingsBtn" class="primary" value="default">SAVE</button></form></dialog>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="/assets/app.js" defer></script>
+</body>
+</html>

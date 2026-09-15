@@ -1,4 +1,4 @@
-name: OSIRIS AI Fusion Security
+name: ORBYTHRA Security
 
 on:
   pull_request:
@@ -6,7 +6,12 @@ on:
       - "osiris_ai_fusion/**"
       - ".github/workflows/osiris-ai-fusion-security.yml"
   push:
-    branches: [main]
+    branches:
+      - main
+      - osiris-fusion-v1-release
+      - osiris-fusion-universal-capabilities
+      - osiris-fusion-provider-federation
+      - osiris-fusion-public-saas
     paths:
       - "osiris_ai_fusion/**"
       - ".github/workflows/osiris-ai-fusion-security.yml"
@@ -29,10 +34,28 @@ jobs:
         run: |
           python -m pip install --upgrade pip pip-audit
           pip-audit -r requirements.txt
+      - name: Scan repository for credential-like material
+        run: python scripts/scan_secrets.py
 
   docker-build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: Build hardened container
-        run: docker build --pull -t osiris-ai-fusion:ci osiris_ai_fusion
+        run: docker build --pull -t orbythra:ci osiris_ai_fusion
+      - name: Inspect non-root runtime user
+        run: docker run --rm --entrypoint sh orbythra:ci -c 'test "$(id -u)" = "10001"'
+      - name: Validate production Compose security baseline
+        working-directory: osiris_ai_fusion
+        run: |
+          cat > .env.production <<'EOF'
+          SAAS_BASE_URL=https://example.invalid
+          CORS_ORIGINS=https://example.invalid
+          REQUIRE_SIGNED_RECEIPTS=false
+          WATCHER_ENABLED=false
+          EOF
+          docker compose -f docker-compose.production.yml config > /tmp/orbythra-compose.yml
+          grep -q 'read_only: true' /tmp/orbythra-compose.yml
+          grep -q 'no-new-privileges:true' /tmp/orbythra-compose.yml
+          grep -q 'cap_drop:' /tmp/orbythra-compose.yml
+          rm -f .env.production
