@@ -4,8 +4,7 @@ import base64
 import hashlib
 import json
 import os
-import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import httpx
@@ -34,7 +33,7 @@ def _epoch_to_iso(value: Any) -> str | None:
     except (TypeError, ValueError):
         return None
     try:
-        return datetime.fromtimestamp(ts, tz=timezone.utc).date().isoformat()
+        return datetime.fromtimestamp(ts, tz=UTC).date().isoformat()
     except (OSError, OverflowError, ValueError):
         return None
 
