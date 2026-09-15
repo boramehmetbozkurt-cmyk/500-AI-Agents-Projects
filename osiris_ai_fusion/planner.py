@@ -86,6 +86,7 @@ DEFAULT_TOOL_SET = {
     "news",
     "country_risk",
 }
+LOCAL_ONLY_CAPABILITIES = {"calculator", "direct_reasoning"}
 
 
 def infer_question_type(query: str) -> str:
@@ -139,8 +140,9 @@ def deterministic_tools(
     capabilities = {name for name in inferred if name in available}
     selected = native | capabilities
 
+    local_only = bool(selected) and selected.issubset(LOCAL_ONLY_CAPABILITIES)
     providers = route_providers(query)
-    if providers and "provider_federation" in available:
+    if providers and "provider_federation" in available and not local_only:
         selected.add("provider_federation")
 
     if not selected and any(term in q for term in OSINT_BROAD_TERMS):
@@ -153,11 +155,9 @@ def deterministic_tools(
     ):
         selected = {"provider_federation"}
 
-    # ORBYTHRA Universal Deep Search rule: an otherwise-unclassified query is
-    # treated as an external lookup instead of being answered from model memory.
-    # Explicit local tasks (drafting/translation/ideation/calculation) have
-    # already selected their local capability above, so this catches arbitrary
-    # factual questions such as a person, company, place, event or concept name.
+    # Universal Deep Search: arbitrary factual lookups default to external
+    # evidence rather than model memory. Explicit local tasks were selected
+    # above and therefore do not reach this branch.
     if not selected and "provider_federation" in available:
         selected = {"provider_federation"}
 
