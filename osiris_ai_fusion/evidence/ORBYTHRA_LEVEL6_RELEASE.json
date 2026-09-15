@@ -1,0 +1,78 @@
+{
+  "product": "ORBYTHRA Persistent Adaptive Research Operator",
+  "release_label": "Level 6 architecture target - Persistent Autonomous Research Operator",
+  "claim_boundary": "This release is not claimed to be general AGI. The label describes the implemented product architecture and autonomy envelope.",
+  "recorded_at": "2026-09-15T20:55:46.868Z",
+  "source": {
+    "repository": "boramehmetbozkurt-cmyk/500-AI-Agents-Projects",
+    "branch": "main",
+    "core_source_commit": "bb5663d337c36737770f9db30ffaa3cb885572c8",
+    "root": "osiris_ai_fusion"
+  },
+  "production": {
+    "provider": "AppDeploy",
+    "app_id": "orbythra-adaptive-core-llftzg",
+    "version_name": "v3",
+    "snapshot_version": "1789505746868",
+    "live_url": "https://orbythra-adaptive-core-llftzg.v2.appdeploy.ai/",
+    "status": "ready",
+    "qa": {
+      "frontend_errors": 0,
+      "network_errors": 0,
+      "backend_errors": 0
+    },
+    "persistent_goal_scheduler": {
+      "enabled": true,
+      "cron": "17 * * * *",
+      "timezone": "Europe/Istanbul",
+      "handler": "goalScheduler",
+      "max_due_goals_per_run": 3,
+      "failure_count_at_release": 0
+    }
+  },
+  "implemented_capabilities": [
+    "TR/EN evidence-first research",
+    "multi-step bounded planning and subquery decomposition",
+    "historical timeline reconstruction",
+    "server-resolved digital mapping",
+    "technical/entity visual retrieval",
+    "AI idea and experiment development",
+    "tenant-isolated episodic memory",
+    "consolidated evidence-linked fact memory",
+    "self-evaluation and confidence calibration",
+    "single bounded no-new-tools refinement pass",
+    "persistent multi-iteration goals",
+    "scheduled bounded goal progression",
+    "learned research policy from repeated evaluation metrics",
+    "approval-gated action ledger",
+    "bounded follow-up research execution after approval",
+    "external connector actions fail closed when no connector is bound",
+    "cognitive telemetry",
+    "intent/evidence/report integrity receipts",
+    "optional encryption in the canonical Python core when a deployment key is configured"
+  ],
+  "safety_and_autonomy_contract": {
+    "autonomous_read_only_research": true,
+    "autonomous_external_side_effects": false,
+    "external_effects_require_explicit_approval": true,
+    "unbound_external_connector_behavior": "waiting_connector; no effect is simulated",
+    "refinement_external_tool_calls": 0,
+    "max_refinement_passes": 1,
+    "memory_is_not_fresh_evidence": true,
+    "guest_persistent_memory": false
+  },
+  "verification": {
+    "github_quality": "success",
+    "github_dependency_audit": "success",
+    "github_docker_build": "success",
+    "github_buyer_dataroom": "success",
+    "note": "The repository's GitHub deploy job is not counted as production deployment evidence because DEPLOY_HOOK_URL was previously observed unset. AppDeploy v3 is the actual production deployment evidence for this release."
+  },
+  "remaining_evidence_not_code_gaps": [
+    "Repeated live benchmark runs over a statistically useful sample",
+    "Multi-week production telemetry and SLO history",
+    "Independent third-party evaluation and pentest reports",
+    "Real customer/pilot task-success and business evidence",
+    "Explicit connector adapters for each external side-effecting service the operator is authorized to use"
+  ]
+}
