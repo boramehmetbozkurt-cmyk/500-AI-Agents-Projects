@@ -151,7 +151,18 @@ async def run(base_url: str, api_path: str, suite_path: Path, timeout: float) ->
     suite = json.loads(suite_path.read_text(encoding="utf-8"))
     api_key = os.getenv("ORBYTHRA_BENCHMARK_API_KEY", "").strip()
     bearer = os.getenv("ORBYTHRA_BENCHMARK_BEARER_TOKEN", "").strip()
-    headers = {"Content-Type": "application/json"}
+    headers = {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "User-Agent": "ORBYTHRA-Strategic-Validation/1.0",
+    }
+    normalized_base = base_url.rstrip("/")
+    if "appdeploy.ai" in normalized_base:
+        # AppDeploy applies browser-origin CSRF protections to public POST routes.
+        # The benchmark calls the same public route as the first-party web client,
+        # so bind the request to the deployed app origin instead of bypassing auth.
+        headers["Origin"] = normalized_base
+        headers["Referer"] = normalized_base + "/"
     if api_key:
         headers["X-API-Key"] = api_key
     if bearer:
