@@ -10,7 +10,10 @@
     evidence: $("evidenceView"), evidenceCount: $("evidenceCount"), correlations: $("correlationView"),
     correlationCount: $("correlationCount"), markerCount: $("markerCount"), bluf: $("bluf"),
     claims: $("claims"), confidence: $("confidenceBadge"), receipt: $("receiptView"), seal: $("sealBadge"),
-    system: $("systemView"), refreshSystem: $("refreshSystemBtn"), log: $("eventLog"), clearLog: $("clearLogBtn")
+    security: $("securityView"), timeline: $("timelineView"), timelineCount: $("timelineCount"),
+    ideas: $("ideaView"), ideaCount: $("ideaCount"), visuals: $("visualView"), visualCount: $("visualCount"),
+    spatialSummary: $("spatialSummary"), system: $("systemView"), refreshSystem: $("refreshSystemBtn"),
+    log: $("eventLog"), clearLog: $("clearLogBtn")
   };
 
   let map;
@@ -41,7 +44,7 @@
   function log(message, obj) {
     const stamp = new Date().toISOString();
     const payload = obj === undefined ? message : `${message}\n${JSON.stringify(obj, null, 2)}`;
-    els.log.textContent = `[${stamp}] ${payload}\n\n${els.log.textContent}`.slice(0, 40000);
+    els.log.textContent = `[${stamp}] ${payload}\n\n${els.log.textContent}`.slice(0, 50000);
   }
 
   function setConnection(ok, detail = "") {
@@ -51,7 +54,7 @@
   }
 
   function setStage(stage) {
-    const order = ["plan", "evidence", "correlation", "analysis", "receipt", "complete"];
+    const order = ["plan", "evidence", "correlation", "enrichment", "analysis", "receipt", "complete"];
     const current = order.indexOf(stage);
     document.querySelectorAll(".stage").forEach((node) => {
       const idx = order.indexOf(node.dataset.stage);
@@ -84,8 +87,10 @@
       if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
       const title = escapeHtml(item.title || item.label || item.tool || "ORBYTHRA evidence");
       const evidenceId = escapeHtml(item.evidence_id || "");
+      const sourceUrl = safeHttpUrl(item.source_url);
+      const sourceLink = sourceUrl ? `<br><a href="${escapeHtml(sourceUrl)}" target="_blank" rel="noopener noreferrer">source</a>` : "";
       L.circleMarker([lat, lon], { radius: 7, weight: 2, fillOpacity: .7 })
-        .bindPopup(`<strong>${title}</strong>${evidenceId ? `<br><code>${evidenceId}</code>` : ""}`)
+        .bindPopup(`<strong>${title}</strong>${evidenceId ? `<br><code>${evidenceId}</code>` : ""}${sourceLink}`)
         .addTo(markerLayer);
       bounds.push([lat, lon]);
     }
@@ -127,6 +132,52 @@
     els.correlations.innerHTML = items.map((item) => `<div class="card"><strong>${escapeHtml(item.summary || item.reason || "Correlation candidate")}</strong><small>distance=${escapeHtml(item.distance_km ?? "—")} km · time=${escapeHtml(item.time_delta_seconds ?? "—")} s</small><small>Correlation is not causation.</small></div>`).join("");
   }
 
+  function renderTimeline(items = []) {
+    els.timelineCount.textContent = `${items.length} EVENTS`;
+    if (!items.length) {
+      els.timeline.className = "stack empty";
+      els.timeline.textContent = "Kanıtlarla doğrulanmış tarihçe çıkarılamadı.";
+      return;
+    }
+    els.timeline.className = "stack timeline";
+    els.timeline.innerHTML = items.map((item) => {
+      const refs = (item.evidence_ids || []).map((ref) => `<span class="ref">${escapeHtml(ref)}</span>`).join("");
+      return `<div class="card timeline-card"><strong>${escapeHtml(item.date || "?")} · ${escapeHtml(item.title || "Event")}</strong><p>${escapeHtml(item.summary || "")}</p>${item.significance ? `<small>${escapeHtml(item.significance)}</small>` : ""}<div class="refs">${refs}</div></div>`;
+    }).join("");
+  }
+
+  function renderIdeas(items = []) {
+    els.ideaCount.textContent = `${items.length} IDEAS`;
+    if (!items.length) {
+      els.ideas.className = "stack empty";
+      els.ideas.textContent = "Henüz yeni fikir üretilmedi.";
+      return;
+    }
+    els.ideas.className = "stack";
+    els.ideas.innerHTML = items.map((item) => {
+      const refs = (item.evidence_ids || []).map((ref) => `<span class="ref">${escapeHtml(ref)}</span>`).join("");
+      const risks = (item.risks || []).map((risk) => `<li>${escapeHtml(risk)}</li>`).join("");
+      return `<div class="card idea-card"><strong>${escapeHtml(item.title || "Idea")}</strong><p>${escapeHtml(item.thesis || "")}</p>${item.rationale ? `<small><b>Rationale:</b> ${escapeHtml(item.rationale)}</small>` : ""}${item.why_now ? `<small><b>Why now:</b> ${escapeHtml(item.why_now)}</small>` : ""}${item.next_experiment ? `<small><b>Next experiment:</b> ${escapeHtml(item.next_experiment)}</small>` : ""}${risks ? `<ul>${risks}</ul>` : ""}<small>confidence=${escapeHtml(item.confidence ?? "—")}</small><div class="refs">${refs}</div></div>`;
+    }).join("");
+  }
+
+  function renderVisuals(items = []) {
+    els.visualCount.textContent = `${items.length} VISUALS`;
+    if (!items.length) {
+      els.visuals.className = "visual-grid empty";
+      els.visuals.textContent = "Teknik veya varlık görseli bulunamadı.";
+      return;
+    }
+    els.visuals.className = "visual-grid";
+    els.visuals.innerHTML = items.map((item) => {
+      const image = safeHttpUrl(item.thumbnail_url || item.url);
+      const source = safeHttpUrl(item.source_url);
+      if (!image) return "";
+      const open = source || safeHttpUrl(item.url);
+      return `<a class="visual-card" href="${escapeHtml(open)}" target="_blank" rel="noopener noreferrer"><img src="${escapeHtml(image)}" alt="${escapeHtml(item.title || "reference visual")}" loading="lazy" /><span>${escapeHtml(item.title || "Reference")}</span><small>${escapeHtml(item.provider || "source")} · ${escapeHtml(item.kind || "reference")}</small></a>`;
+    }).join("");
+  }
+
   function renderReport(report, confidence) {
     const score = Number(report?.overall_confidence ?? confidence?.score ?? 0);
     els.confidence.className = `badge ${score >= .8 ? "ok" : score >= .5 ? "warn" : "muted"}`;
@@ -138,14 +189,21 @@
       const refs = (claim.evidence_ids || []).map((ref) => `<span class="ref">${escapeHtml(ref)}</span>`).join("");
       return `<div class="claim"><div class="claim-top"><span class="claim-kind">${escapeHtml(claim.kind || "claim")}</span><span class="micro">${escapeHtml(claim.confidence ?? "")}</span></div><p>${escapeHtml(claim.text || claim.claim || "")}</p><div class="refs">${refs}</div></div>`;
     }).join("") : `<div class="empty">Kanıta bağlı ek claim üretilmedi.</div>`;
+    renderTimeline(report?.historical_timeline || []);
+    renderIdeas(report?.developed_ideas || []);
+    renderVisuals(report?.visual_assets || []);
+    els.spatialSummary.className = `spatial-summary ${report?.spatial_summary ? "" : "empty"}`;
+    els.spatialSummary.textContent = report?.spatial_summary || "Konumsal analiz üretilemedi.";
     renderMarkers(report?.map_markers || []);
   }
 
-  function renderReceipt(receipt) {
+  function renderReceipt(receipt, security) {
     els.receipt.textContent = JSON.stringify(receipt || {}, null, 2);
+    els.security.textContent = JSON.stringify(security || {}, null, 2);
     const pass = receipt && String(receipt.policy_check || "").includes("PASS") && String(receipt.effect_match || "").includes("PASS");
+    const encrypted = Boolean(security && security.enabled);
     els.seal.className = `badge ${pass ? "ok" : "warn"}`;
-    els.seal.textContent = pass ? "VERIFIED" : "CHECK";
+    els.seal.textContent = pass ? (encrypted ? "VERIFIED + ENCRYPTED" : "VERIFIED") : "CHECK";
   }
 
   async function fetchJson(url) {
@@ -159,7 +217,8 @@
     try {
       const [health, providers, tools] = await Promise.all([fetchJson("/health"), fetchJson("/providers"), fetchJson("/tools")]);
       setConnection(true);
-      const blocked = (providers.policies || []).filter((p) => p.commercial_allowed === false).length;
+      const policies = providers.tool_policies || providers.policies || [];
+      const blocked = policies.filter((p) => p.commercial_allowed === false).length;
       const toolCount = Array.isArray(tools.tools) ? tools.tools.length : 0;
       els.system.innerHTML = [
         `<div class="card"><strong>${escapeHtml(health.service)} v${escapeHtml(health.version)}</strong><small>Status: ${escapeHtml(health.status)}</small></div>`,
@@ -182,10 +241,22 @@
     els.correlationCount.textContent = "0 CANDIDATES";
     els.correlations.className = "stack empty";
     els.correlations.textContent = "İlişkiler çıkarılıyor…";
+    els.timelineCount.textContent = "0 EVENTS";
+    els.timeline.className = "stack empty";
+    els.timeline.textContent = "Tarihçe oluşturuluyor…";
+    els.ideaCount.textContent = "0 IDEAS";
+    els.ideas.className = "stack empty";
+    els.ideas.textContent = "AI fikir motoru bekleniyor…";
+    els.visualCount.textContent = "0 VISUALS";
+    els.visuals.className = "visual-grid empty";
+    els.visuals.textContent = "Görsel bağlam aranıyor…";
+    els.spatialSummary.className = "spatial-summary empty";
+    els.spatialSummary.textContent = "Dijital harita zenginleştiriliyor…";
     els.bluf.className = "bluf empty";
     els.bluf.textContent = "ORBYTHRA cevabı hazırlanıyor…";
     els.claims.innerHTML = "";
     els.receipt.textContent = "Doğrulama makbuzu bekleniyor…";
+    els.security.textContent = "Şifreleme durumu bekleniyor…";
     els.seal.className = "badge muted";
     els.seal.textContent = "PENDING";
     renderMarkers([]);
@@ -207,15 +278,23 @@
       renderCorrelations(event.correlation_candidates || []);
       renderMarkers(event.map_markers || []);
     }
+    if (event.stage === "enrichment") {
+      renderMarkers(event.map_markers || []);
+      renderVisuals(event.visual_assets || []);
+      if (event.digital_map) {
+        els.spatialSummary.className = "spatial-summary";
+        els.spatialSummary.textContent = `Digital map active · ${event.digital_map.marker_count || 0} marker(s)`;
+      }
+    }
     if (event.stage === "analysis") renderReport(event.report || {}, null);
-    if (event.stage === "receipt") renderReceipt(event.receipt || {});
+    if (event.stage === "receipt") renderReceipt(event.receipt || {}, event.security || {});
     if (event.stage === "complete") {
       const result = event.result || {};
       renderPlan(result.plan, result.planner_model);
       renderEvidence(result.evidence_index || []);
       renderCorrelations(result.correlation_candidates || []);
       renderReport(result.report || {}, result.confidence || {});
-      renderReceipt(result.receipt || {});
+      renderReceipt(result.receipt || {}, result.security || {});
     }
     if (event.stage === "error") throw new Error(event.detail || event.error || "Search failed");
   }
