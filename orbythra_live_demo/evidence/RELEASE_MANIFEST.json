@@ -1,0 +1,34 @@
+{
+  "product": "ORBYTHRA Buyer Demo",
+  "release_name": "v2",
+  "release_date": "2026-09-15T23:05:18+03:00",
+  "live_url": "https://orbythra-buyer-demo-pns9l3.v2.appdeploy.ai/",
+  "appdeploy_app_id": "orbythra-buyer-demo-pns9l3",
+  "appdeploy_snapshot_version": "1789502718462",
+  "architecture": "frontend+backend",
+  "deployment_status": "ready",
+  "qa_at_release": {
+    "frontend_errors": 0,
+    "backend_errors": 0,
+    "network_errors": 0
+  },
+  "benchmark": {
+    "path": "orbythra_live_demo/evidence/benchmark_cases.json",
+    "sha256": "b09e23504123ee2fb1ae10c958a2afe0896458989aea4a44279560c4c8e84b24",
+    "case_count": 24
+  },
+  "evidence_bundle_commit_before_manifest": "ec3e627d4b2f597b20ed0a2bc769b694e21f48d8",
+  "validation_reference": {
+    "radianode": "engineering validation requested; report pending",
+    "interclin_ai": "Search/RAG/deep-research evaluation requested; report pending",
+    "synack": "web/API/multi-tenant/AI-LLM pentest and retest requested; report pending"
+  },
+  "release_controls": {
+    "nda_before_sensitive_material": true,
+    "controlled_evaluation_package": true,
+    "formal_report_required": true,
+    "remediation_retest_required": true,
+    "cryptographically_signed": false,
+    "note": "The AppDeploy snapshot id and GitHub commit history provide immutable release references. A cryptographic/GPG code-signing signature has not been created."
+  }
+}
