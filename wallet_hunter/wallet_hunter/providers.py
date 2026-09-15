@@ -289,9 +289,28 @@ class OfficialEligibilityProvider:
         return item
 
 
+# Directory holding opportunities.example.json, one level above this package.
+PROJECT_DIR = Path(__file__).resolve().parent.parent
+
+
 class ManifestOpportunityProvider:
+    def path(self) -> Path:
+        """Resolve the configured manifest.
+
+        WALLET_HUNTER_OPPORTUNITIES defaults to a bare filename, so resolving it
+        against the process working directory made the service depend on where it
+        was started: the README's `cd wallet_hunter && uvicorn ...` found the file,
+        while a container or supervisor starting from anywhere else silently loaded
+        no opportunities at all. A relative path that does not resolve against the
+        working directory now falls back to the project directory.
+        """
+        configured = Path(settings.wallet_hunter_opportunities).expanduser()
+        if configured.is_absolute() or configured.exists():
+            return configured
+        return PROJECT_DIR / configured
+
     def load(self) -> list[Opportunity]:
-        path = Path(settings.wallet_hunter_opportunities)
+        path = self.path()
         if not path.exists():
             return []
         payload = json.loads(path.read_text(encoding="utf-8"))

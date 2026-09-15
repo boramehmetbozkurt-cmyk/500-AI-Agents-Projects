@@ -35,7 +35,9 @@ class WalletScanner:
             results = await asyncio.gather(
                 *(self._scan_chain(client, chain, request.address) for chain in chains)
             )
-            manifest = ManifestOpportunityProvider().load()
+            manifest_provider = ManifestOpportunityProvider()
+            manifest_path = manifest_provider.path()
+            manifest = manifest_provider.load()
             scoped = self._scope_opportunities(manifest, chains, request.address)
             checker = OfficialEligibilityProvider(client)
             checked = await asyncio.gather(
@@ -46,6 +48,13 @@ class WalletScanner:
         warnings: list[str] = []
         if unknown:
             warnings.append(f"Unsupported chains ignored: {', '.join(unknown)}")
+        if not manifest_path.exists():
+            # Silently returning zero opportunities is indistinguishable from a wallet
+            # that genuinely qualifies for nothing, so say which file was missing.
+            warnings.append(
+                f"Opportunity manifest not found at {manifest_path}; no claim opportunities "
+                "were evaluated. Point WALLET_HUNTER_OPPORTUNITIES at an existing file."
+            )
         if not settings.etherscan_api_key:
             warnings.append(
                 "ETHERSCAN_API_KEY is not configured; ERC-20 discovery is limited to native balances."
