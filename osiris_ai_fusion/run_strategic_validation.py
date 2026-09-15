@@ -25,7 +25,8 @@ async def _run_case(
         raise ValueError(f"Invalid strategic validation case id: {case_id}")
     started = time.perf_counter()
     response = await client.get(
-        f"{base_url.rstrip('/')}/api/benchmark/{case_id}",
+        f"{base_url.rstrip('/')}/api/benchmark",
+        params={"id": case_id},
         headers={
             "Accept": "application/json",
             "User-Agent": "ORBYTHRA-Strategic-Validation/1.0",
@@ -90,7 +91,7 @@ async def run(base_url: str, suite_path: Path, timeout: float) -> dict[str, Any]
     return {
         "suite": suite.get("suite"),
         "base_url": base_url,
-        "api_path": "/api/benchmark/:id",
+        "api_path": "/api/benchmark?id=<SVxx>",
         "case_count": len(results),
         "executed_cases": len(results),
         "skipped_cases": 0,
