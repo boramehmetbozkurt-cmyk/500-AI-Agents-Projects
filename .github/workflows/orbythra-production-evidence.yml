@@ -1,0 +1,85 @@
+name: ORBYTHRA Production Evidence
+
+on:
+  schedule:
+    - cron: "17 */6 * * *"
+  workflow_dispatch:
+    inputs:
+      path:
+        description: "Public endpoint to probe"
+        required: false
+        default: "/health"
+      requests:
+        description: "Bounded requests per evidence run"
+        required: false
+        default: "5"
+      concurrency:
+        description: "Bounded concurrency"
+        required: false
+        default: "1"
+
+permissions:
+  contents: read
+
+jobs:
+  production-evidence:
+    runs-on: ubuntu-latest
+    env:
+      ORBYTHRA_PRODUCTION_BASE_URL: ${{ vars.ORBYTHRA_PRODUCTION_BASE_URL }}
+      ORBYTHRA_PRODUCTION_API_KEY: ${{ secrets.ORBYTHRA_PRODUCTION_API_KEY }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Prepare evidence directory
+        run: mkdir -p dist/production-evidence
+
+      - name: Record configuration gap
+        if: ${{ env.ORBYTHRA_PRODUCTION_BASE_URL == '' }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          payload = {
+              "schema": "orbythra.production-evidence-configuration.v1",
+              "configured": False,
+              "required_variable": "ORBYTHRA_PRODUCTION_BASE_URL",
+              "run_id": os.getenv("GITHUB_RUN_ID", "unknown"),
+              "claim_boundary": "No production uptime measurement occurred in this run.",
+          }
+          Path("dist/production-evidence/configuration-required.json").write_text(
+              json.dumps(payload, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          PY
+
+      - name: Probe production
+        if: ${{ env.ORBYTHRA_PRODUCTION_BASE_URL != '' }}
+        working-directory: osiris_ai_fusion
+        env:
+          PROBE_PATH: ${{ github.event.inputs.path || '/health' }}
+          PROBE_REQUESTS: ${{ github.event.inputs.requests || '5' }}
+          PROBE_CONCURRENCY: ${{ github.event.inputs.concurrency || '1' }}
+        run: |
+          python ops_production_probe.py \
+            --base-url "$ORBYTHRA_PRODUCTION_BASE_URL" \
+            --path "$PROBE_PATH" \
+            --requests "$PROBE_REQUESTS" \
+            --concurrency "$PROBE_CONCURRENCY" \
+            --output "../dist/production-evidence/probe-${GITHUB_RUN_ID}.json" \
+            --fail-below 1.0
+
+      - name: Upload production evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: orbythra-production-evidence-${{ github.run_id }}
+          path: dist/production-evidence
+          retention-days: 90

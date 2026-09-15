@@ -1,0 +1,67 @@
+name: ORBYTHRA Signed Release Attestation
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  signed-attestation:
+    runs-on: ubuntu-latest
+    env:
+      SEAL_ED25519_PRIVATE_KEY_B64: ${{ secrets.ORBYTHRA_ATTESTATION_ED25519_PRIVATE_KEY_B64 }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Require owner-controlled signing key
+        run: |
+          if [ -z "$SEAL_ED25519_PRIVATE_KEY_B64" ]; then
+            echo "Missing repository secret ORBYTHRA_ATTESTATION_ED25519_PRIVATE_KEY_B64" >&2
+            exit 1
+          fi
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install runtime dependencies
+        working-directory: osiris_ai_fusion
+        run: pip install -r requirements.txt
+
+      - name: Build release evidence
+        working-directory: osiris_ai_fusion
+        run: |
+          mkdir -p dist/signed-release
+          python ops_benchmark.py --output dist/signed-release/orbythra-core-benchmark.json
+          python ops_deep_research_benchmark.py --output dist/signed-release/orbythra-deep-research-benchmark.json
+          python scripts/build_asset_carveout.py --output dist/signed-release
+
+      - name: Create signed attestation
+        working-directory: osiris_ai_fusion
+        run: |
+          python ops_attestation.py \
+            --output dist/signed-release/orbythra-release-attestation.json \
+            dist/signed-release/orbythra-core-benchmark.json \
+            dist/signed-release/orbythra-deep-research-benchmark.json \
+            ASSET_SALE_READINESS.md \
+            THIRD_PARTY_NOTICES.md
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          path = Path("dist/signed-release/orbythra-release-attestation.json")
+          payload = json.loads(path.read_text(encoding="utf-8"))
+          if payload.get("signature", {}).get("signed") is not True:
+              raise SystemExit("release attestation is not signed")
+          print("Signed Ed25519 release attestation verified as present.")
+          PY
+
+      - name: Upload signed release evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: orbythra-signed-release-${{ github.sha }}
+          path: osiris_ai_fusion/dist/signed-release
+          retention-days: 90
