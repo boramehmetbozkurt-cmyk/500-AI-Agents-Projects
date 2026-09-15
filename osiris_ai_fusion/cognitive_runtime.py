@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import base64
 import hashlib
 import json
@@ -39,11 +40,7 @@ def _epoch_to_iso(value: Any) -> str | None:
 
 
 async def _wikipedia_entity_enrichment(query: str) -> dict[str, Any]:
-    """Resolve a likely entity to coordinates and a representative public image.
-
-    This is read-only enrichment. It does not treat Wikipedia content as instructions;
-    the returned fields are passed to the analyst as untrusted evidence context.
-    """
+    """Resolve a likely entity to coordinates and a representative public image."""
 
     language_order = ["tr", "en"] if _looks_turkish(query) else ["en", "tr"]
     params = {
@@ -59,6 +56,7 @@ async def _wikipedia_entity_enrichment(query: str) -> dict[str, Any]:
         "origin": "*",
     }
     timeout = httpx.Timeout(6.0, connect=3.0)
+    best_visuals: list[dict[str, Any]] = []
     async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
         for lang in language_order:
             try:
@@ -105,9 +103,24 @@ async def _wikipedia_entity_enrichment(query: str) -> dict[str, Any]:
                             "kind": "technical_reference" if _is_technical_query(query) else "entity_reference",
                         }
                     )
-            if markers or visuals:
-                return {"map_markers": markers[:8], "visual_assets": visuals[:6]}
-    return {"map_markers": [], "visual_assets": []}
+            if visuals and not best_visuals:
+                best_visuals = visuals[:6]
+            if markers:
+                return {"map_markers": markers[:8], "visual_assets": visuals[:6] or best_visuals}
+    return {"map_markers": [], "visual_assets": best_visuals}
+
+
+def _marker_key(row: dict[str, Any]) -> tuple[float, float, str] | None:
+    if row.get("lat") is None or row.get("lon") is None:
+        return None
+    try:
+        return (
+            round(float(row["lat"]), 5),
+            round(float(row["lon"]), 5),
+            str(row.get("label", "")),
+        )
+    except (TypeError, ValueError):
+        return None
 
 
 async def enrich_research_context(
@@ -117,10 +130,10 @@ async def enrich_research_context(
 ) -> dict[str, Any]:
     entity = await _wikipedia_entity_enrichment(query)
     markers = list(existing_markers)
-    seen = {(round(float(row.get("lat", 999)), 5), round(float(row.get("lon", 999)), 5), str(row.get("label", ""))) for row in markers if row.get("lat") is not None and row.get("lon") is not None}
+    seen = {key for row in markers if (key := _marker_key(row)) is not None}
     for row in entity["map_markers"]:
-        key = (round(float(row["lat"]), 5), round(float(row["lon"]), 5), str(row.get("label", "")))
-        if key not in seen:
+        key = _marker_key(row)
+        if key is not None and key not in seen:
             seen.add(key)
             markers.append(row)
 
@@ -150,6 +163,44 @@ async def enrich_research_context(
             "mode": "evidence-first-geospatial-context",
         },
     }
+
+
+async def resolve_timeline_locations(
+    report: dict[str, Any],
+    existing_markers: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Attach geospatial context to timeline locations without inventing coordinates."""
+
+    labels: list[str] = []
+    event_by_label: dict[str, dict[str, Any]] = {}
+    for event in report.get("historical_timeline") or []:
+        label = str(event.get("location_label") or "").strip()
+        if not label or label in event_by_label:
+            continue
+        labels.append(label)
+        event_by_label[label] = event
+        if len(labels) >= 6:
+            break
+    if not labels:
+        return existing_markers
+
+    resolved = await asyncio.gather(*(_wikipedia_entity_enrichment(label) for label in labels))
+    markers = list(existing_markers)
+    seen = {key for row in markers if (key := _marker_key(row)) is not None}
+    for label, payload in zip(labels, resolved, strict=True):
+        event = event_by_label[label]
+        for row in payload.get("map_markers", [])[:2]:
+            enriched = dict(row)
+            enriched["label"] = f"{event.get('date', '')} · {event.get('title', label)}"
+            enriched["timestamp"] = event.get("date")
+            refs = event.get("evidence_ids") or []
+            if refs:
+                enriched["evidence_id"] = refs[0]
+            key = _marker_key(enriched)
+            if key is not None and key not in seen:
+                seen.add(key)
+                markers.append(enriched)
+    return markers[:200]
 
 
 def _load_aes_key() -> bytes | None:
