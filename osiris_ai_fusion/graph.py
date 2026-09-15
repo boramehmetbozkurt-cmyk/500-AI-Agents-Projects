@@ -9,10 +9,11 @@ from langgraph.graph import END, StateGraph
 from capabilities import UniversalToolClient
 from config import get_settings
 from correlation import correlate_evidence
+from evidence_schema import compact_sources, normalize_evidence
 from llm import ModelRouter
 from planner import build_plan, deterministic_tools
 from provenance import confidence_from_evidence, evidence_bundle_digest, public_evidence_index
-from schemas import AnalysisReport, Claim, InvestigationPlan
+from schemas import AnalysisReport, Claim, EvidenceItem, InvestigationPlan
 from seal import ReplayGuard, authorize_execution, seal_intent, sign_receipt
 
 
@@ -25,6 +26,7 @@ class AgentState(TypedDict, total=False):
     planner_model: dict[str, str]
     evidence: dict[str, Any]
     evidence_index: list[dict[str, Any]]
+    evidence_items: list[dict[str, Any]]
     evidence_digest: str
     confidence: dict[str, Any]
     correlation_candidates: list[dict[str, Any]]
@@ -86,6 +88,7 @@ async def collector_node(state: AgentState) -> AgentState:
     return {
         "evidence": evidence,
         "evidence_index": public_evidence_index(evidence),
+        "evidence_items": [item.model_dump() for item in normalize_evidence(evidence)],
         "evidence_digest": evidence_bundle_digest(evidence),
         "confidence": confidence_from_evidence(evidence),
         "_sealed_intent": intent,
@@ -138,6 +141,12 @@ async def analyst_node(state: AgentState) -> AgentState:
         {
             "scope": state.get("scope", {}),
             "plan": state.get("plan", {}),
+            # Deduplicated, ranked sources come first: the payload is truncated to
+            # max_prompt_evidence_chars, so the citable list must survive the cut
+            # even when the raw provider blobs do not.
+            "sources": compact_sources(
+                [EvidenceItem.model_validate(row) for row in state.get("evidence_items", [])]
+            ),
             "evidence": state.get("evidence", {}),
             "correlation_candidates": state.get("correlation_candidates", []),
         },

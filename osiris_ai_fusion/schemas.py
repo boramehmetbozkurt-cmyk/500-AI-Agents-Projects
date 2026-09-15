@@ -38,6 +38,29 @@ class EvidenceRef(BaseModel):
     digest: str
 
 
+class EvidenceItem(BaseModel):
+    """One citable source, normalized out of any provider or AI-research payload.
+
+    Providers and research engines each answer in their own shape; this is the
+    single schema the answer layer, the UI and any consumer can rely on. Items
+    that resolve to the same canonical URL are merged rather than repeated, so
+    `corroboration` counts how many independent origins surfaced this source.
+    """
+
+    item_id: str
+    title: str = Field(max_length=400)
+    url: str | None = None
+    domain: str | None = None
+    snippet: str = Field(default="", max_length=1200)
+    published_at: int | None = None
+    tools: list[str] = Field(default_factory=list, max_length=24)
+    providers: list[str] = Field(default_factory=list, max_length=24)
+    evidence_ids: list[str] = Field(default_factory=list, max_length=24)
+    corroboration: int = Field(default=1, ge=1)
+    score: float = Field(default=0.0, ge=0.0, le=1.0)
+    score_reasons: list[str] = Field(default_factory=list, max_length=8)
+
+
 class Claim(BaseModel):
     text: str = Field(min_length=1, max_length=1200)
     kind: Literal["observation", "inference", "correlation"] = "observation"
