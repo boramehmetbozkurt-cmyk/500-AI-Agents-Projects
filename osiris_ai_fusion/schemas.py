@@ -75,12 +75,48 @@ class MapMarker(BaseModel):
     tool: str | None = None
     evidence_id: str | None = None
     timestamp: str | int | None = None
+    source_url: str | None = None
+    source_title: str | None = Field(default=None, max_length=300)
+
+
+class TimelineEvent(BaseModel):
+    date: str = Field(min_length=1, max_length=80)
+    title: str = Field(min_length=1, max_length=300)
+    summary: str = Field(min_length=1, max_length=1600)
+    significance: str = Field(default="", max_length=1000)
+    confidence: float = Field(default=0.5, ge=0.0, le=1.0)
+    evidence_ids: list[str] = Field(default_factory=list, max_length=24)
+    location_label: str | None = Field(default=None, max_length=300)
+
+
+class IdeaProposal(BaseModel):
+    title: str = Field(min_length=1, max_length=300)
+    thesis: str = Field(min_length=1, max_length=1400)
+    rationale: str = Field(default="", max_length=1800)
+    why_now: str = Field(default="", max_length=1000)
+    next_experiment: str = Field(default="", max_length=1200)
+    risks: list[str] = Field(default_factory=list, max_length=10)
+    confidence: float = Field(default=0.5, ge=0.0, le=1.0)
+    evidence_ids: list[str] = Field(default_factory=list, max_length=24)
+
+
+class VisualAsset(BaseModel):
+    title: str = Field(min_length=1, max_length=300)
+    url: str
+    thumbnail_url: str | None = None
+    source_url: str | None = None
+    provider: str = Field(default="unknown", max_length=100)
+    kind: str = Field(default="reference", max_length=100)
 
 
 class AnalysisReport(BaseModel):
     bluf: str = Field(min_length=1, max_length=4000)
     claims: list[Claim] = Field(default_factory=list, max_length=40)
     correlations: list[str] = Field(default_factory=list, max_length=20)
+    historical_timeline: list[TimelineEvent] = Field(default_factory=list, max_length=60)
+    developed_ideas: list[IdeaProposal] = Field(default_factory=list, max_length=12)
+    visual_assets: list[VisualAsset] = Field(default_factory=list, max_length=12)
+    spatial_summary: str = Field(default="", max_length=1800)
     data_gaps: list[str] = Field(default_factory=list, max_length=30)
     next_checks: list[str] = Field(default_factory=list, max_length=20)
     overall_confidence: float = Field(default=0.0, ge=0.0, le=1.0)
