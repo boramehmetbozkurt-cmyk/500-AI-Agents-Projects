@@ -1,0 +1,50 @@
+name: ORBYTHRA Resilience Evidence
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "osiris_ai_fusion/ops_backup.py"
+      - "osiris_ai_fusion/ops_disaster_recovery.py"
+      - "osiris_ai_fusion/ops_tenant_assurance.py"
+      - "osiris_ai_fusion/tests/test_ops_resilience.py"
+      - ".github/workflows/orbythra-resilience-evidence.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  resilience-evidence:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: osiris_ai_fusion
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install test dependencies
+        run: pip install -r requirements-dev.txt
+      - name: Run resilience tests
+        run: pytest -q tests/test_ops_resilience.py
+      - name: Produce synthetic DR evidence
+        run: |
+          mkdir -p dist/resilience
+          python ops_disaster_recovery.py --rows 5000 --output dist/resilience/orbythra-dr-regression.json
+      - name: Assert evidence boundary
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          evidence = json.loads(Path('dist/resilience/orbythra-dr-regression.json').read_text())
+          assert evidence['integrity_verified'] is True
+          assert evidence['production_exercise'] is False
+          assert evidence['rpo_claim_seconds'] is None
+          PY
+      - name: Upload resilience evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: orbythra-resilience-evidence
+          path: osiris_ai_fusion/dist/resilience/orbythra-dr-regression.json
+          if-no-files-found: error
