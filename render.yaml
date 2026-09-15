@@ -2,7 +2,7 @@ services:
   - type: web
     name: orbythra
     runtime: docker
-    branch: osiris-fusion-v1-release
+    branch: main
     rootDir: osiris_ai_fusion
     dockerfilePath: ./Dockerfile
     dockerContext: .
