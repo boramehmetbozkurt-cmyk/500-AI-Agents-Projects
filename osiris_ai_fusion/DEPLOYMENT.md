@@ -111,11 +111,17 @@ The repository root contains `render.yaml`.
 Deployment flow:
 
 1. Create a Render Blueprint from this repository.
-2. Select branch `osiris-fusion-v1-release` until v1 is merged to `main`.
+2. `render.yaml` tracks `main`, which is where v1 now lives.
 3. Keep the persistent disk enabled for the SQLite investigation store and replay database.
 4. Set the model-provider secrets in Render; do not put them in Git.
 5. Set `SEAL_ED25519_PRIVATE_KEY_B64` and switch `REQUIRE_SIGNED_RECEIPTS=true` when signed receipts are required.
 6. After deployment, verify `/health`, `/ready`, `/tools`, `/providers`, and the Command Center root page.
+
+The image reads `PORT` at start-up and falls back to `8787`, so Render, Railway, Fly
+and Cloud Run all work from the same image with no start-command override. Set
+`WEB_CONCURRENCY` to raise the uvicorn worker count; the replay guard and store are
+SQLite, so see the scale-out note in `ARCHITECTURE.md` before going past one worker
+per persistent disk.
 
 ## 6. Railway
 
@@ -136,6 +142,33 @@ Example persistent variables:
 FUSION_STORE_PATH=/data/fusion.sqlite3
 SEAL_REPLAY_DB=/data/seal-replay.sqlite3
 ```
+
+## 6b. Continuous deployment
+
+`.github/workflows/deploy.yml` redeploys on every push to `main` that touches
+`osiris_ai_fusion/**` or `render.yaml`, and can also be run manually from the
+Actions tab.
+
+It is deliberately provider-agnostic: it POSTs to a deploy-hook URL rather than
+holding a hosting API key, so this repository never stores provider credentials.
+
+Configure two things in **Settings → Secrets and variables → Actions**:
+
+| Name | Kind | Required | Value |
+| --- | --- | --- | --- |
+| `DEPLOY_HOOK_URL` | Secret | yes, to deploy at all | Render: *Service → Settings → Deploy Hook*. Railway: a deployment webhook URL. Any endpoint that redeploys on POST works. |
+| `DEPLOY_HEALTH_URL` | Variable | optional | Public `/health` URL, e.g. `https://orbythra.onrender.com/health`. |
+
+Behaviour worth knowing before you rely on it:
+
+- With no `DEPLOY_HOOK_URL` the job explains what is missing and **succeeds**, so a
+  fork is never blocked by a deployment it cannot perform.
+- A hook that answers 4xx/5xx **fails the build**. A deploy that silently reports
+  success is the worst failure mode here, so the check is explicit rather than
+  relying on the runner's shell flags.
+- A deploy hook returning 200 only means the build was *queued*. When
+  `DEPLOY_HEALTH_URL` is set the workflow then polls `/health` for up to ten
+  minutes and only reports success once the new revision actually serves traffic.
 
 ## 7. Commercial source policy
 

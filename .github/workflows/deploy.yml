@@ -1,0 +1,86 @@
+name: Deploy
+
+# Deployment is triggered by a provider deploy-hook URL held as a repository
+# secret, so this repository never stores a hosting API key and the workflow is
+# provider-agnostic: Render deploy hooks, Railway webhooks and anything else that
+# deploys on POST all work unchanged.
+#
+# With no secret configured the job reports what is missing and succeeds, so a
+# fork or a clone is never blocked by a deployment it cannot perform.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "osiris_ai_fusion/**"
+      - "render.yaml"
+      - ".github/workflows/deploy.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: orbythra-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Trigger the deployment
+        id: trigger
+        env:
+          DEPLOY_HOOK_URL: ${{ secrets.DEPLOY_HOOK_URL }}
+        run: |
+          set -euo pipefail
+          if [ -z "${DEPLOY_HOOK_URL:-}" ]; then
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            {
+              echo "### Deployment skipped"
+              echo
+              echo "No \`DEPLOY_HOOK_URL\` secret is configured, so there is nothing to"
+              echo "deploy to. Add the deploy-hook URL from your hosting provider under"
+              echo "Settings → Secrets and variables → Actions to enable this job."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          echo "configured=true" >> "$GITHUB_OUTPUT"
+          # The failure has to be checked explicitly. `status=$(curl ...)` inside an
+          # assignment is easy to read as safe, but whether a non-zero curl aborts
+          # the step then depends on the runner's shell flags, and a deploy that
+          # silently reports success is the worst possible failure mode here.
+          if ! status=$(curl --fail --silent --show-error --location \
+            --retry 3 --retry-delay 5 --retry-connrefused \
+            --max-time 60 \
+            --output /dev/null --write-out '%{http_code}' \
+            --request POST "${DEPLOY_HOOK_URL}"); then
+            echo "::error::Deploy hook rejected the request (HTTP ${status:-none})."
+            exit 1
+          fi
+          echo "Deploy hook accepted the request (HTTP ${status})."
+
+      - name: Wait for the new revision to serve traffic
+        if: steps.trigger.outputs.configured == 'true' && vars.DEPLOY_HEALTH_URL != ''
+        env:
+          HEALTH_URL: ${{ vars.DEPLOY_HEALTH_URL }}
+        run: |
+          set -euo pipefail
+          # A hook that returns 200 only means the build was queued. The deploy is
+          # not done until the service answers, so poll /health rather than
+          # reporting success on the queue acknowledgement.
+          for attempt in $(seq 1 60); do
+            code=$(curl --silent --show-error --location --max-time 10 \
+              --output /dev/null --write-out '%{http_code}' "${HEALTH_URL}" || true)
+            if [ "${code}" = "200" ]; then
+              echo "Service healthy after ${attempt} attempt(s)."
+              echo "### Deployed and healthy" >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            echo "attempt ${attempt}: HTTP ${code:-none}, retrying in 10s"
+            sleep 10
+          done
+          echo "::error::Service did not return HTTP 200 from ${HEALTH_URL} within 10 minutes."
+          exit 1
