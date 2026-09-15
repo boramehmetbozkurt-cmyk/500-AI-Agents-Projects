@@ -17,6 +17,33 @@ sources. It is not a generic autonomous computer-use agent.
 8. Verifier binds intent, executed tools, evidence digest and analysis digest into a receipt.
 9. API returns evidence, confidence metadata, analysis, model identity and receipt.
 
+## Unified evidence schema
+
+Provider federation, the passive feeds and the AI Research Council each answer in
+their own shape. `evidence_schema.py` normalizes all of them into one `EvidenceItem`
+list so the answer layer, the UI and any external consumer read a single contract
+instead of parsing per-provider payloads.
+
+- **Extraction** walks any payload for objects that name a fetchable source. A
+  provider result's envelope keys (`source_url`, `provider_id`, `freshness`, …)
+  describe the fetch rather than a document and are excluded, so calling more
+  providers never manufactures more "sources".
+- **Deduplication** keys on a canonical URL: host lowercased and de-`www`-ed,
+  scheme normalized, tracking parameters (`utm_*`, `fbclid`, `gclid`, …) dropped,
+  query ordered, fragment and trailing slash removed. One document surfaced by
+  three providers is one item whose `corroboration` is 3.
+- **Ranking** is a fixed, published weighting — provider authority 0.45,
+  corroboration 0.30, freshness 0.20, resolvable URL 0.05 — and every item carries
+  `score_reasons` explaining its own position. Ordering is deliberately inspectable
+  rather than learned, because a research tool has to be able to defend it.
+- **Boundary.** Normalization organizes provenance only. It never infers a fact,
+  never merges two different documents that happen to agree, and corroboration
+  counts independent *origins*, not independent *verification*.
+
+The ranked list is returned as `evidence_items` and a compact projection is placed
+ahead of the raw evidence in the analyst prompt, so the citable sources survive
+the `max_prompt_evidence_chars` truncation even when the raw payloads do not.
+
 ## Why LangGraph is the only required agent framework
 
 LangGraph owns orchestration. Specialist frameworks such as smolagents are optional worker
