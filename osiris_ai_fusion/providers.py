@@ -11,6 +11,8 @@ from urllib.parse import urlparse
 
 import httpx
 
+from ai_research_council import fetch_ai_research_council
+
 
 @dataclass(frozen=True)
 class ProviderSpec:
@@ -473,7 +475,7 @@ def _validate_url(url: str) -> None:
 
 
 def _headers(spec: ProviderSpec) -> dict[str, str]:
-    headers = {"User-Agent": "OSIRIS-Fusion/1.2 read-only provider federation"}
+    headers = {"User-Agent": "ORBYTHRA/1.3 read-only provider federation"}
     if spec.api_key_env:
         api_key = os.getenv(spec.api_key_env, "").strip()
         if api_key:
@@ -540,16 +542,7 @@ async def fetch_federated(
     max_response_bytes: int,
 ) -> dict[str, Any]:
     selected = route_providers(query)
-    if not selected:
-        return {
-            "status": "provider_required",
-            "query": query,
-            "provider_domains": provider_domains_for_query(query),
-            "provider_gaps": provider_gap_messages(query),
-            "providers_used": [],
-            "results": [],
-        }
-    results = await asyncio.gather(
+    provider_task = asyncio.gather(
         *(
             _fetch_one(
                 spec,
@@ -561,10 +554,31 @@ async def fetch_federated(
             for spec in selected
         )
     )
+    council_task = fetch_ai_research_council(
+        query,
+        timeout=timeout,
+        max_response_bytes=max_response_bytes,
+    )
+    provider_results, council = await asyncio.gather(provider_task, council_task)
+    council_results = council.get("results", []) if isinstance(council, dict) else []
+    results = list(provider_results) + list(council_results)
+    if not selected and not council.get("engines_used"):
+        return {
+            "status": "provider_required",
+            "query": query,
+            "provider_domains": provider_domains_for_query(query),
+            "provider_gaps": provider_gap_messages(query),
+            "providers_used": [],
+            "ai_engines_used": [],
+            "ai_research": council,
+            "results": [],
+        }
     return {
         "status": "ok" if any(item.get("ok") for item in results) else "provider_failure",
         "query": query,
         "provider_domains": provider_domains_for_query(query),
         "providers_used": [spec.provider_id for spec in selected],
+        "ai_engines_used": council.get("engines_used", []),
+        "ai_research": council,
         "results": results,
     }
