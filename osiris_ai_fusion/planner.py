@@ -153,6 +153,14 @@ def deterministic_tools(
     ):
         selected = {"provider_federation"}
 
+    # ORBYTHRA Universal Deep Search rule: an otherwise-unclassified query is
+    # treated as an external lookup instead of being answered from model memory.
+    # Explicit local tasks (drafting/translation/ideation/calculation) have
+    # already selected their local capability above, so this catches arbitrary
+    # factual questions such as a person, company, place, event or concept name.
+    if not selected and "provider_federation" in available:
+        selected = {"provider_federation"}
+
     if not selected:
         selected = {"direct_reasoning"} if "direct_reasoning" in available else set()
 
@@ -184,30 +192,33 @@ async def build_plan(
     region = caller_region
     time_range = caller_time_range or infer_time_range(query)
     question_type = infer_question_type(query)
-    model_meta = {"provider": "deterministic", "model": "provider-federation-router-v2"}
+    model_meta = {"provider": "deterministic", "model": "provider-federation-router-v3-deep"}
     deterministic_external = "provider_federation" in tools
 
     if settings.ai_planner_enabled and requested_tools is None:
         system = (
-            "You are OSIRIS Fusion's provider-federated capability planner. Return only "
+            "You are ORBYTHRA's bilingual Universal Deep Search planner. Return only "
             "JSON matching the schema. Select only from AVAILABLE_TOOLS and use the "
-            "smallest sufficient set. provider_federation is the single domain-agnostic "
-            "external research capability: it ranks and fans out across multiple trusted "
-            "read-only providers, with general web used only as a fallback. Do not invent "
+            "smallest sufficient set. provider_federation is the domain-agnostic "
+            "external research capability: it fans out across trusted read-only global "
+            "providers and may use Turkish and English reference sources, scientific "
+            "indexes, current-event sources and domain providers. Do not invent "
             "provider-specific tool names. Use direct_reasoning only for drafting, "
-            "rewriting, ideation and stable reasoning tasks. For external factual research "
-            "select provider_federation when native OSIRIS feeds are insufficient. Never "
-            "substitute direct_reasoning for fresh facts. Never request active scanning, "
-            "exploitation, credential access, facial tracking or intrusive surveillance."
+            "rewriting, translation, ideation and stable reasoning tasks. For factual "
+            "lookup or research, select provider_federation when native ORBYTHRA feeds "
+            "are insufficient. Never substitute model memory for fresh or verifiable "
+            "facts. Never request active scanning, exploitation, credential access, "
+            "facial tracking or intrusive surveillance."
         )
         prompt = (
             f"QUERY: {query}\n"
             f"USER_SCOPE: {json.dumps(scope, ensure_ascii=False)}\n"
             f"AVAILABLE_TOOLS: {', '.join(sorted(available))}\n"
             f"MAX_TOOL_CALLS: {settings.max_tool_calls}\n"
-            "External providers are hidden behind provider_federation. Sports, finance, "
-            "crypto, science, patents, companies, legal, real estate, vehicles, jobs, "
-            "travel, shopping, social, places and general web are provider domains, not "
+            "The user can ask in Turkish or English. External providers are hidden "
+            "behind provider_federation. Sports, finance, crypto, science, patents, "
+            "companies, legal, real estate, vehicles, jobs, travel, shopping, social, "
+            "places, global news and general knowledge are provider domains, not "
             "separate autonomous tool contracts."
         )
         try:
@@ -248,8 +259,9 @@ async def build_plan(
         )
 
     rationale = (
-        "Provider-federated capability router selected the smallest authorized "
-        "read-only tool set; external research can fan out across ranked providers."
+        "ORBYTHRA Universal Deep Search selected the smallest authorized read-only "
+        "tool set; factual lookups default to provider federation and can fan out "
+        "across Turkish, English and domain-specific global sources."
     )
     if gaps:
         rationale += " Provider gaps: " + "; ".join(gaps)
