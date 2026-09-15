@@ -6,6 +6,28 @@ from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
 
+from dotenv import load_dotenv
+
+# README.md and DEPLOYMENT.md both document `cp .env.example .env`, and python-dotenv
+# is already a declared runtime dependency, but nothing was reading that file: every
+# local `uvicorn app:app` run silently ignored it. Compose was unaffected because it
+# passes the file through `env_file:`.
+ENV_FILE = Path(__file__).resolve().parent / ".env"
+
+
+def load_env_file(path: Path = ENV_FILE) -> bool:
+    """Read the documented .env file, if one exists.
+
+    The path is anchored to this module rather than the process working directory,
+    so the result does not depend on where the server was started from.
+    ``override=False`` keeps real environment variables authoritative, which is what
+    containers, CI and secret managers rely on.
+    """
+    return load_dotenv(path, override=False)
+
+
+load_env_file()
+
 
 def _bool(name: str, default: bool = False) -> bool:
     raw = os.getenv(name)
