@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Ask ORBYTHRA</title>
+<meta name="description" content="Ask ORBYTHRA — source-aware search demo" />
+<style>
+:root{--bg:#050b11;--panel:#0b1722;--line:#1b3a50;--text:#eef8ff;--muted:#89a8bc;--cyan:#6ee7ff;--green:#8ef6b5;--warn:#ffd166}*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 50% -10%,#163c58 0,transparent 33%),linear-gradient(#071019,#050b11);color:var(--text);font:15px/1.6 Inter,system-ui,-apple-system,"Segoe UI",sans-serif;min-height:100vh}.wrap{max-width:1120px;margin:auto;padding:24px}.top{display:flex;justify-content:space-between;gap:16px;align-items:center}.brand{font-weight:950;letter-spacing:.18em}.brand small{display:block;color:var(--muted);font-size:9px;letter-spacing:.06em}.status{font-size:10px;color:var(--green);border:1px solid #28536b;border-radius:999px;padding:7px 10px}.hero{text-align:center;padding:72px 0 28px}.hero h1{font-size:clamp(40px,7vw,72px);line-height:1;margin:8px 0 14px;letter-spacing:-.04em}.hero p{color:var(--muted);max-width:760px;margin:auto}.search{max-width:900px;margin:28px auto 0;background:rgba(11,23,34,.96);border:1px solid #32627e;border-radius:22px;padding:10px;box-shadow:0 24px 80px rgba(0,0,0,.35)}.row{display:flex;gap:8px}.q{flex:1;min-width:0;border:0;border-radius:14px;background:#050d14;color:white;padding:18px;font-size:17px;outline:none}.q:focus{box-shadow:inset 0 0 0 1px var(--cyan)}.ask{border:1px solid #53d8d2;background:linear-gradient(110deg,#0d7089,#176349);color:#fff;font-weight:900;border-radius:14px;padding:0 22px;cursor:pointer}.ask:disabled{opacity:.55}.examples{display:flex;justify-content:center;gap:8px;flex-wrap:wrap;margin-top:14px}.chip{border:1px solid #24495f;background:#091823;color:#a8c8d9;border-radius:999px;padding:7px 11px;font-size:10px;cursor:pointer}.grid{display:grid;grid-template-columns:2fr 1fr;gap:14px;margin-top:20px}.panel{background:linear-gradient(180deg,rgba(13,31,44,.95),rgba(7,18,27,.95));border:1px solid var(--line);border-radius:17px;padding:18px}.panel h2{margin:0 0 10px;font-size:13px}.answer{font-size:17px;line-height:1.75;white-space:pre-wrap}.muted{color:var(--muted)}.meta{display:grid;grid-template-columns:1fr 1fr;gap:10px}.metric{background:#07141d;border:1px solid #19384b;border-radius:12px;padding:12px}.metric b{display:block;font-size:25px}.metric small{color:var(--muted)}.source{padding:12px 0;border-bottom:1px solid #163145}.source:last-child{border:0}.source a{color:#e7faff;text-decoration:none;font-weight:800}.source a:hover{color:var(--cyan)}.source p{margin:4px 0 0;color:var(--muted);font-size:11px}.tag{display:inline-block;border:1px solid #28536b;border-radius:7px;padding:3px 6px;font-size:9px;color:#96bfd2;margin-top:5px}.full{grid-column:1/-1}.notice{color:#6f90a3;font-size:10px;margin-top:16px;text-align:center}.loader{display:inline-block;width:13px;height:13px;border:2px solid #31566b;border-top-color:var(--cyan);border-radius:50%;animation:s .7s linear infinite;margin-right:7px;vertical-align:-2px}@keyframes s{to{transform:rotate(360deg)}}@media(max-width:800px){.grid{grid-template-columns:1fr}.row{flex-direction:column}.ask{padding:14px}.hero{padding-top:48px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="top"><div class="brand">ORBYTHRA<small>VERIFIABLE TEMPORAL REALITY OS</small></div><div class="status">ASK MODE · LIVE</div></header>
+<section class="hero">
+<div style="font-size:10px;font-weight:900;letter-spacing:.18em;color:var(--cyan)">UNIVERSAL SEARCH</div>
+<h1>Ne bilmek istiyorsun?</h1>
+<p>Bir şey yaz. ORBYTHRA önce cevap verir; ardından hangi kaynaklardan geldiğini ve güven düzeyini gösterir.</p>
+<form class="search" id="form"><div class="row"><input id="q" class="q" minlength="3" maxlength="500" required autocomplete="off" placeholder="Örn: NVIDIA son üç yılda yapay zekâ tarafında ne yaptı?"/><button id="ask" class="ask" type="submit">SOR</button></div></form>
+<div class="examples"><button class="chip">İzmir'in son 100 yıldaki değişimi</button><button class="chip">BRCA1 hakkında önemli bilimsel gelişmeler</button><button class="chip">NVIDIA'nın AI rakipleri kim?</button><button class="chip">Quantum computing şirketleri</button></div>
+</section>
+<section class="grid">
+<article class="panel"><h2>ORBYTHRA CEVABI</h2><div id="answer" class="answer muted">Sorunu yazdığında cevap burada görünecek.</div></article>
+<aside class="panel"><h2>GÜVEN & KAYNAK</h2><div class="meta"><div class="metric"><b id="conf">—</b><small>confidence</small></div><div class="metric"><b id="count">0</b><small>sources</small></div></div><div style="margin-top:12px;color:var(--muted);font-size:11px" id="engine">Public-source fallback hazır.</div></aside>
+<article class="panel full"><h2>KAYNAKLAR</h2><div id="sources" class="muted">Henüz kaynak yok.</div></article>
+</section>
+<div class="notice">Bu public demo, Wikipedia ve OpenAlex gibi erişilebilir public kaynakları kullanır. Tam ORBYTHRA backend devreye alındığında aynı ekran provider federation, evidence graph, LLM synthesis ve SEAL doğrulamasına bağlanır.</div>
+</div>
+<script>
+(()=>{'use strict';
+const $=id=>document.getElementById(id),form=$('form'),q=$('q'),ask=$('ask'),answer=$('answer'),sources=$('sources'),conf=$('conf'),count=$('count'),engine=$('engine');
+const esc=s=>String(s??'').replace(/[&<>\"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[c]));
+const clean=s=>String(s??'').replace(/<[^>]*>/g,' ').replace(/\s+/g,' ').trim();
+const sentences=(t,n=4)=>{const p=clean(t).match(/[^.!?]+[.!?]+|[^.!?]+$/g)||[];return p.slice(0,n).join(' ').trim()};
+function busy(v){ask.disabled=v;ask.innerHTML=v?'<span class="loader"></span>ARIYOR…':'SOR'}
+function renderSources(items){count.textContent=items.length;sources.innerHTML=items.length?items.map((s,i)=>`<div class="source"><a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">${i+1}. ${esc(s.title)}</a><p>${esc(s.snippet||'')}</p><span class="tag">${esc(s.provider)}</span></div>`).join(''):'<span class="muted">Kaynak bulunamadı.</span>'}
+async function wiki(query){const u='https://tr.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch='+encodeURIComponent(query)+'&gsrlimit=5&prop=extracts%7Cinfo&exintro=1&explaintext=1&inprop=url&format=json&origin=*';const r=await fetch(u);if(!r.ok)throw new Error('Wikipedia erişilemedi');const d=await r.json();return Object.values(d.query?.pages||{}).sort((a,b)=>(a.index??99)-(b.index??99)).map(x=>({title:x.title,url:x.fullurl,provider:'WIKIPEDIA',snippet:sentences(x.extract||'',2),extract:x.extract||''}))}
+async function openalex(query){const u='https://api.openalex.org/works?search='+encodeURIComponent(query)+'&per-page=5';const r=await fetch(u);if(!r.ok)throw new Error('OpenAlex erişilemedi');const d=await r.json();return (d.results||[]).map(x=>({title:x.title||'OpenAlex work',url:x.doi||x.id,provider:'OPENALEX',snippet:[x.publication_year,(x.authorships||[]).slice(0,3).map(a=>a.author?.display_name).filter(Boolean).join(', ')].filter(Boolean).join(' · '),extract:''}))}
+async function search(query){const tasks=await Promise.allSettled([wiki(query),openalex(query)]);let items=[];for(const t of tasks)if(t.status==='fulfilled')items=items.concat(t.value);const w=items.filter(x=>x.provider==='WIKIPEDIA'&&x.extract);let text=w.length?sentences(w.slice(0,2).map(x=>x.extract).join(' '),5):'';const academic=items.filter(x=>x.provider==='OPENALEX');if(academic.length)text+=(text?'\n\n':'')+'Akademik aramada öne çıkan çalışmalar: '+academic.slice(0,3).map(x=>x.title).join('; ')+'.';if(!text)text='Bu sorgu için erişilebilir public kaynaklardan yeterli içerik çekilemedi.';return{text,items:items.slice(0,10)}}
+form.addEventListener('submit',async e=>{e.preventDefault();const query=q.value.trim();if(query.length<3)return;busy(true);answer.classList.remove('muted');answer.textContent='Kaynaklar taranıyor…';sources.textContent='Aranıyor…';engine.textContent='Wikipedia + OpenAlex';const start=performance.now();try{const r=await search(query);answer.textContent=r.text;renderSources(r.items);const score=Math.min(90,35+r.items.length*6+(r.items.some(x=>x.provider==='OPENALEX')?10:0));conf.textContent=score+'%';engine.textContent='Public-source fallback · '+Math.round(performance.now()-start)+' ms';}catch(err){answer.textContent='Arama tamamlanamadı: '+(err.message||err);renderSources([]);conf.textContent='—';}finally{busy(false)}});
+document.querySelectorAll('.chip').forEach(b=>b.addEventListener('click',()=>{q.value=b.textContent;form.requestSubmit()}));
+})();
+</script>
+</body>
+</html>
