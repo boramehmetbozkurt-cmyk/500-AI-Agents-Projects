@@ -1,0 +1,87 @@
+{
+  "schema": "orbythra.deep-research-benchmark-cases.v2",
+  "note": "Synthetic, rights-cleared corpus written for this benchmark. Every provider, document and URL is invented; none of it is real provider output and no case asserts anything about the real world. A provider returns a document when every one of that document's terms appears in the question it is asked. The federation deliberately does NOT model relevance ranking or result truncation, so this corpus cannot and does not demonstrate a recall gain from decomposition.",
+  "cases": [
+    {
+      "id": "compound-regional-risk",
+      "question": "Izmir deprem riski nedir? Mugla orman yangini riski nedir?",
+      "subtopics": ["seismic", "wildfire"],
+      "corpus": [
+        {
+          "provider_id": "alpha_reference",
+          "documents": [
+            {
+              "url": "https://reference.test/izmir-seismic-profile",
+              "title": "Izmir seismic profile",
+              "summary": "Synthetic reference article on regional fault activity.",
+              "subtopic": "seismic",
+              "terms": ["deprem"]
+            },
+            {
+              "url": "https://reference.test/aegean-fault-lines",
+              "title": "Aegean fault lines",
+              "summary": "Synthetic overview of fault systems in the region.",
+              "subtopic": "seismic",
+              "terms": ["deprem"]
+            }
+          ]
+        },
+        {
+          "provider_id": "beta_news",
+          "documents": [
+            {
+              "url": "https://www.reference.test/izmir-seismic-profile/?utm_source=feed",
+              "title": "Izmir seismic profile",
+              "summary": "The same synthetic article, syndicated with a tracking parameter.",
+              "subtopic": "seismic",
+              "terms": ["deprem"]
+            }
+          ]
+        },
+        {
+          "provider_id": "gamma_environment",
+          "documents": [
+            {
+              "url": "https://environment.test/mugla-wildfire-outlook",
+              "title": "Mugla wildfire outlook",
+              "summary": "Synthetic seasonal wildfire risk note.",
+              "subtopic": "wildfire",
+              "terms": ["yangini"]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "atomic-single-topic",
+      "question": "Izmir deprem riski nedir",
+      "subtopics": ["seismic"],
+      "corpus": [
+        {
+          "provider_id": "alpha_reference",
+          "documents": [
+            {
+              "url": "https://reference.test/izmir-seismic-profile",
+              "title": "Izmir seismic profile",
+              "summary": "Synthetic reference article on regional fault activity.",
+              "subtopic": "seismic",
+              "terms": ["deprem"]
+            }
+          ]
+        },
+        {
+          "provider_id": "beta_news",
+          "documents": [
+            {
+              "url": "https://reference.test/izmir-seismic-profile#summary",
+              "title": "Izmir seismic profile",
+              "summary": "The same synthetic article addressed with a fragment.",
+              "subtopic": "seismic",
+              "terms": ["deprem"]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

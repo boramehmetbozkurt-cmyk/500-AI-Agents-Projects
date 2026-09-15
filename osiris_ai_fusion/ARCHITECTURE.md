@@ -17,6 +17,32 @@ sources. It is not a generic autonomous computer-use agent.
 8. Verifier binds intent, executed tools, evidence digest and analysis digest into a receipt.
 9. API returns evidence, confidence metadata, analysis, model identity and receipt.
 
+## Benchmarks and what they do not claim
+
+`ops_deep_research_benchmark.py` runs one synthetic corpus through three
+configurations of the retrieval pipeline — raw, normalization only, and both
+normalization and recursive subquery planning — so each feature's contribution is a
+number instead of a claim in prose. It makes no network calls, needs no API keys and
+produces byte-identical output on every run, so a reader can reproduce it.
+
+The result file carries its own limits as machine-readable fields, and the Asset
+Readiness workflow asserts on them so the data room can never ship it claiming more
+than it measures:
+
+- `independent_external_validation: false` — system and harness share an author.
+- `third_party_baseline_comparison: false` — comparing against external search, RAG
+  or deep-research products requires running those products.
+- `models_recall_from_decomposition: false` — the synthetic federation applies no
+  relevance ranking and no result truncation, and truncation is the mechanism by
+  which decomposition improves recall against a real backend. Modelling it here
+  would measure the assumption rather than the system, so `subtopic_coverage` comes
+  out identical across variants and is reported that way on purpose.
+
+What the numbers do support: deduplication, which is real because the corpus carries
+one document under several URL spellings, and per-question attribution, which is
+real because the pipeline issues and records the questions. Both are reported next to
+their cost in tool calls.
+
 ## Recursive subquery planning
 
 A single-shot planner answers a compound question with one fan-out, so the parts

@@ -41,12 +41,15 @@ jobs:
       - name: Build buyer artifacts
         env:
           SEAL_ED25519_PRIVATE_KEY_B64: ${{ secrets.SEAL_ED25519_PRIVATE_KEY_B64 }}
+          # Keeps the ablation byte-reproducible and fully offline.
+          AI_PLANNER_ENABLED: "false"
         run: |
           python scripts/build_buyer_artifacts.py --output dist/buyer-dataroom
           python scripts/build_asset_carveout.py --output dist/buyer-dataroom > dist/buyer-dataroom/carveout-build-receipt.json
           python ops_benchmark.py --scientists 250 --works 250 --output dist/buyer-dataroom/orbythra-core-benchmark.json > /dev/null
           python ops_resolution_benchmark.py --output dist/buyer-dataroom/orbythra-science-resolution-benchmark.json > /dev/null
           python ops_load_benchmark.py --requests 100 --concurrency 10 --output dist/buyer-dataroom/orbythra-load-baseline.json > /dev/null
+          python ops_deep_research_benchmark.py --output dist/buyer-dataroom/orbythra-deep-research-benchmark.json > /dev/null
           python scripts/bootstrap_buyer_demo.py --output dist/buyer-dataroom/buyer-demo > /dev/null
           cp -R legal dist/buyer-dataroom/legal
           cp -R enterprise dist/buyer-dataroom/enterprise
@@ -59,7 +62,8 @@ jobs:
             dist/buyer-dataroom/orbythra-python-sbom.spdx.json \
             dist/buyer-dataroom/orbythra-core-benchmark.json \
             dist/buyer-dataroom/orbythra-science-resolution-benchmark.json \
-            dist/buyer-dataroom/orbythra-load-baseline.json > /dev/null
+            dist/buyer-dataroom/orbythra-load-baseline.json \
+            dist/buyer-dataroom/orbythra-deep-research-benchmark.json > /dev/null
           python - <<'PY'
           import json
           from pathlib import Path
@@ -71,6 +75,7 @@ jobs:
           benchmark = json.loads((root / "orbythra-core-benchmark.json").read_text())
           resolution = json.loads((root / "orbythra-science-resolution-benchmark.json").read_text())
           load = json.loads((root / "orbythra-load-baseline.json").read_text())
+          deep_research = json.loads((root / "orbythra-deep-research-benchmark.json").read_text())
           demo = json.loads((root / "buyer-demo" / "demo-manifest.json").read_text())
           attestation = json.loads((root / "orbythra-release-attestation.json").read_text())
           carveout_receipts = list(root.glob("orbythra-v1.3-carveout-*.receipt.json"))
@@ -102,6 +107,16 @@ jobs:
           assert resolution["independent_external_validation"] is False
           assert resolution["overall"]["cases"] >= 10
           assert resolution["overall"]["accuracy"] == 1.0
+          assert deep_research["schema"] == "orbythra.deep-research-benchmark-result.v1"
+          assert deep_research["benchmark_kind"] == "synthetic_offline_pipeline_ablation"
+          assert deep_research["cases"]
+          # The data room must never ship this file claiming to be independent, a
+          # third-party comparison, or evidence of a recall gain from decomposition.
+          assert deep_research["independent_external_validation"] is False
+          assert deep_research["third_party_baseline_comparison"] is False
+          assert deep_research["models_recall_from_decomposition"] is False
+          assert deep_research["overall"]["baseline_raw"]["mean_duplicate_rate"] > 0
+          assert deep_research["overall"]["normalized_only"]["mean_duplicate_rate"] == 0.0
           assert load["synthetic_local_asgi"] is True
           assert load["production_measurement"] is False
           assert load["success_rate"] == 1.0

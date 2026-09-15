@@ -131,6 +131,10 @@ Do not market the upstream open-source repository itself as exclusive property.
 - [x] reproducible synthetic core benchmark in buyer data-room artifact
 - [x] deterministic science identity/cross-database resolution regression benchmark
 - [x] rights-cleared synthetic Engineering Intelligence benchmark corpus and evaluator
+- [x] offline deep-research pipeline ablation benchmark (deduplication and per-question
+      attribution against the same pipeline with those features off). It is explicitly not
+      independent, not a third-party comparison, and does not model recall gains from
+      decomposition; gate 7 stays partially satisfied until an external baseline exists.
 - [x] in-process ASGI load/latency regression baseline
 - [x] runtime SLO/latency metrics and admin SLO report surface
 - [x] release provenance attestation tooling with SHA-256 and optional Ed25519 signing
