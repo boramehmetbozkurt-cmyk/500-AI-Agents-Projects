@@ -12,10 +12,10 @@ from correlation import correlate_evidence
 from evidence_schema import compact_sources, normalize_evidence
 from llm import ModelRouter
 from planner import build_plan, deterministic_tools
-from subquery import allocate_subquery_calls, plan_subqueries
 from provenance import confidence_from_evidence, evidence_bundle_digest, public_evidence_index
 from schemas import AnalysisReport, Claim, EvidenceItem, InvestigationPlan
 from seal import ReplayGuard, authorize_execution, seal_intent, sign_receipt
+from subquery import allocate_subquery_calls, plan_subqueries
 
 
 class AgentState(TypedDict, total=False):
