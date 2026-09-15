@@ -1,0 +1,40 @@
+name: ORBYTHRA Public Demo
+
+on:
+  push:
+    branches:
+      - osiris-fusion-v1-release
+    paths:
+      - "orbythra_live_demo/**"
+      - ".github/workflows/orbythra-pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "orbythra-pages"
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+      - name: Upload ORBYTHRA demo
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: orbythra_live_demo
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4
