@@ -227,13 +227,14 @@ async def analyst_node(state: AgentState) -> AgentState:
         "subject's history as a concise chronological historical_timeline whenever the evidence supports dates or "
         "eras; every timeline event must carry supporting evidence_ids. Add location_label to timeline events when a "
         "specific real-world location is supported by the evidence; never invent a place. Analyze spatial context and "
-        "explain what the digital map markers mean in spatial_summary; never invent coordinates. Then use the evidence "
+        "explain what the supplied digital map markers mean in spatial_summary. Map coordinates and visual URLs are "
+        "server-resolved and will be enforced after generation, so do not fabricate replacements. Then use the evidence "
         "and analysis to develop 2-5 clearly labeled ideas, hypotheses, product directions or next-step concepts in "
         "developed_ideas. Ideas are proposals, not facts: explain rationale, why_now, next_experiment, risks and confidence. "
-        "For technical subjects, preserve supplied visual_assets as useful reference visuals. Distinguish observations, "
-        "inferences, calculations and correlation candidates. Correlation is not causation. State uncertainty and missing "
-        "data. Do not recommend active scanning, exploitation, credential collection, facial tracking, or intrusive "
-        "surveillance. Respond in the user's language and return only JSON matching the supplied schema."
+        "Distinguish observations, inferences, calculations and correlation candidates. Correlation is not causation. "
+        "State uncertainty and missing data. Do not recommend active scanning, exploitation, credential collection, "
+        "facial tracking, or intrusive surveillance. Respond in the user's language and return only JSON matching the "
+        "supplied schema."
     )
     prompt = (
         f"USER_QUERY:\n{state['query']}\n\n"
@@ -245,17 +246,15 @@ async def analyst_node(state: AgentState) -> AgentState:
     try:
         payload, result = await ModelRouter().generate_json(system, prompt, AnalysisReport.model_json_schema())
         report = _sanitize_report(AnalysisReport.model_validate(payload), state.get("evidence", {}))
-        updates: dict[str, Any] = {}
-        if not report.map_markers:
-            updates["map_markers"] = state.get("map_markers", [])
-        if not report.visual_assets:
-            updates["visual_assets"] = state.get("visual_assets", [])
+        updates: dict[str, Any] = {
+            "map_markers": state.get("map_markers", []),
+            "visual_assets": state.get("visual_assets", []),
+        }
         if not report.spatial_summary and state.get("map_markers"):
             updates["spatial_summary"] = (
                 f"Digital map contains {len(state.get('map_markers', []))} evidence-linked location marker(s)."
             )
-        if updates:
-            report = report.model_copy(update=updates)
+        report = report.model_copy(update=updates)
         model = {"provider": result.provider, "model": result.model}
     except Exception as exc:
         report = _fallback_report(state, type(exc).__name__)
