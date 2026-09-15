@@ -4,8 +4,8 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="color-scheme" content="dark" />
-  <title>ORBYTHRA — Universal AI/AGI Research Engine</title>
-  <meta name="description" content="ORBYTHRA evidence-first AI/AGI research, digital mapping, historical timeline analysis and idea development." />
+  <title>ORBYTHRA — Adaptive AI Research Engine</title>
+  <meta name="description" content="ORBYTHRA evidence-first adaptive AI research with bounded memory, self-evaluation, digital mapping, timeline analysis and idea development." />
   <link rel="preconnect" href="https://unpkg.com" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="stylesheet" href="/assets/styles.css" />
@@ -20,9 +20,9 @@
 
   <main class="shell">
     <section class="hero panel">
-      <div class="eyebrow">AI/AGI RESEARCH CORE · ENCRYPTED · TEMPORAL · GEOSPATIAL</div>
+      <div class="eyebrow">ADAPTIVE RESEARCH CORE · MEMORY · SELF-EVAL · ENCRYPTED · TEMPORAL · GEOSPATIAL</div>
       <h1>Ask ORBYTHRA anything.</h1>
-      <p>ORBYTHRA araştırır, kanıtları ilişkilendirir, konuyu dijital haritada konumlandırır, tarihçesini çıkarır, analiz eder ve AI motoruyla yeni fikirler geliştirir. Sonuç intent-seal, evidence digest, doğrulama makbuzu ve opsiyonel AES-256-GCM araştırma kapsülüyle korunur.</p>
+      <p>ORBYTHRA ilgili geçmiş araştırmaları hatırlar, soruyu alt hedeflere böler, kanıtları ilişkilendirir, konuyu dijital haritada konumlandırır, tarihçesini çıkarır, yeni fikirler geliştirir ve kendi cevabını puanlar. Kalite eşiğinin altındaysa yeni dış aksiyon açmadan tek bir kontrollü refinement pass yapar. Sonuç intent-seal, evidence digest, doğrulama makbuzu ve opsiyonel AES-256-GCM araştırma kapsülüyle korunur.</p>
       <form id="queryForm" class="query-form">
         <textarea id="queryInput" maxlength="4000" rows="3" placeholder="Örn: NVIDIA'nın AI tarihçesini çıkar, önemli merkezlerini haritada göster, bugünkü konumunu analiz et ve buradan yeni ürün fikirleri geliştir." required></textarea>
         <div class="query-controls">
@@ -35,13 +35,18 @@
     </section>
 
     <section class="status-strip panel" aria-live="polite">
-      <div class="stage active" data-stage="plan"><span>01</span><b>PLAN</b></div><div class="stage" data-stage="evidence"><span>02</span><b>SEARCH</b></div><div class="stage" data-stage="correlation"><span>03</span><b>RELATE</b></div><div class="stage" data-stage="enrichment"><span>04</span><b>MAP/TIME</b></div><div class="stage" data-stage="analysis"><span>05</span><b>THINK</b></div><div class="stage" data-stage="receipt"><span>06</span><b>SEAL</b></div><div class="stage" data-stage="complete"><span>07</span><b>COMPLETE</b></div>
+      <div class="stage active" data-stage="memory"><span>01</span><b>MEMORY</b></div><div class="stage" data-stage="plan"><span>02</span><b>PLAN</b></div><div class="stage" data-stage="evidence"><span>03</span><b>SEARCH</b></div><div class="stage" data-stage="correlation"><span>04</span><b>RELATE</b></div><div class="stage" data-stage="enrichment"><span>05</span><b>MAP/TIME</b></div><div class="stage" data-stage="analysis"><span>06</span><b>THINK</b></div><div class="stage" data-stage="reflection"><span>07</span><b>SELF-EVAL</b></div><div class="stage" data-stage="receipt"><span>08</span><b>SEAL</b></div><div class="stage" data-stage="complete"><span>09</span><b>COMPLETE</b></div>
     </section>
 
     <section class="panel report-panel">
       <div class="panel-head"><h2>ORBYTHRA Answer</h2><span id="confidenceBadge" class="badge muted">CONFIDENCE —</span></div>
       <div id="bluf" class="bluf empty">Sorunu yaz. Kaynaklara dayalı doğrudan cevap burada görünecek.</div>
       <div id="claims" class="claims"></div>
+    </section>
+
+    <section class="grid two">
+      <article class="panel"><div class="panel-head"><h2>Memory & Goal Plan</h2><span class="badge">BOUNDED</span></div><pre id="cognitiveView" class="codebox">Henüz bilişsel plan yok.</pre></article>
+      <article class="panel"><div class="panel-head"><h2>Self-Evaluation & Adaptation</h2><span class="badge">MAX 1 PASS</span></div><pre id="reflectionView" class="codebox">Henüz self-evaluation yok.</pre></article>
     </section>
 
     <section class="grid two">
