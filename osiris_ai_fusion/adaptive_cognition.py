@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import sqlite3
@@ -9,6 +10,7 @@ import uuid
 from pathlib import Path
 from typing import Any
 
+from autonomy import AutonomyStore
 from config import get_settings
 
 _WORD_RE = re.compile(r"[\wçğıöşüÇĞİÖŞÜ-]+", re.UNICODE)
@@ -37,11 +39,21 @@ def _asks_ideas(query: str) -> bool:
     return any(term in q for term in ("fikir", "idea", "öner", "develop", "geliştir", "concept", "strateji", "strategy"))
 
 
-class CognitiveMemory:
-    """Tenant-isolated episodic memory and evaluation ledger.
+def _memory_score(query_tokens: set[str], text: str, quality: float, created_at: int) -> float:
+    memory_tokens = _tokens(text)
+    union = query_tokens | memory_tokens
+    overlap = len(query_tokens & memory_tokens) / max(1, len(union))
+    age_days = max(0.0, (int(time.time()) - int(created_at)) / 86400.0)
+    recency = 1.0 / (1.0 + age_days / 30.0)
+    return 0.72 * overlap + 0.18 * _clamp(quality) + 0.10 * recency
 
-    This is deliberately retrieval-only during planning: memories can influence
-    prioritisation and continuity, but they are not treated as fresh factual evidence.
+
+class CognitiveMemory:
+    """Tenant-isolated episodic + consolidated factual memory.
+
+    Memories are continuity context only. Consolidated facts retain evidence references
+    from earlier runs, but are explicitly marked as not-fresh evidence so current claims
+    still have to be verified by the collector.
     """
 
     def __init__(self, path: str | None = None) -> None:
@@ -81,6 +93,19 @@ class CognitiveMemory:
                 );
                 CREATE INDEX IF NOT EXISTS idx_cognitive_eval_workspace
                     ON cognitive_evaluations(workspace_id, created_at DESC);
+                CREATE TABLE IF NOT EXISTS cognitive_facts (
+                    fact_key TEXT NOT NULL,
+                    workspace_id TEXT NOT NULL,
+                    text TEXT NOT NULL,
+                    evidence_ids_json TEXT NOT NULL,
+                    confidence REAL NOT NULL,
+                    occurrences INTEGER NOT NULL,
+                    first_seen_at INTEGER NOT NULL,
+                    last_seen_at INTEGER NOT NULL,
+                    PRIMARY KEY(fact_key, workspace_id)
+                );
+                CREATE INDEX IF NOT EXISTS idx_cognitive_facts_workspace
+                    ON cognitive_facts(workspace_id, last_seen_at DESC);
                 """
             )
             conn.commit()
@@ -90,29 +115,87 @@ class CognitiveMemory:
         if not query_tokens:
             return []
         with self._connect() as conn:
-            rows = conn.execute(
+            episodes = conn.execute(
                 "SELECT id, query, summary, topics_json, quality_score, created_at "
                 "FROM cognitive_memories WHERE workspace_id=? "
                 "ORDER BY created_at DESC LIMIT 200",
                 (workspace_id,),
             ).fetchall()
+            facts = conn.execute(
+                "SELECT fact_key, text, evidence_ids_json, confidence, occurrences, "
+                "first_seen_at, last_seen_at FROM cognitive_facts WHERE workspace_id=? "
+                "ORDER BY last_seen_at DESC LIMIT 300",
+                (workspace_id,),
+            ).fetchall()
+
         ranked: list[tuple[float, dict[str, Any]]] = []
-        now = int(time.time())
-        for row in rows:
+        for row in episodes:
             item = dict(row)
-            memory_tokens = _tokens(str(item["query"]) + " " + str(item["summary"]))
-            union = query_tokens | memory_tokens
-            overlap = len(query_tokens & memory_tokens) / max(1, len(union))
-            age_days = max(0.0, (now - int(item["created_at"])) / 86400.0)
-            recency = 1.0 / (1.0 + age_days / 30.0)
-            quality = _clamp(float(item["quality_score"]))
-            score = 0.72 * overlap + 0.18 * quality + 0.10 * recency
-            if overlap >= 0.06:
+            score = _memory_score(
+                query_tokens,
+                str(item["query"]) + " " + str(item["summary"]),
+                float(item["quality_score"]),
+                int(item["created_at"]),
+            )
+            if score >= 0.06:
                 item["relevance"] = round(score, 4)
                 item["topics"] = json.loads(item.pop("topics_json") or "[]")
+                item["memory_kind"] = "episode"
+                item["fresh_evidence"] = False
                 ranked.append((score, item))
+
+        for row in facts:
+            item = dict(row)
+            score = _memory_score(
+                query_tokens,
+                str(item["text"]),
+                float(item["confidence"]),
+                int(item["last_seen_at"]),
+            )
+            if score >= 0.06:
+                ranked.append(
+                    (
+                        score,
+                        {
+                            "id": item["fact_key"],
+                            "query": "consolidated fact",
+                            "summary": item["text"],
+                            "quality_score": item["confidence"],
+                            "created_at": item["last_seen_at"],
+                            "relevance": round(score, 4),
+                            "memory_kind": "consolidated_fact",
+                            "fresh_evidence": False,
+                            "historical_evidence_ids": json.loads(
+                                item["evidence_ids_json"] or "[]"
+                            ),
+                            "occurrences": int(item["occurrences"]),
+                        },
+                    )
+                )
+
         ranked.sort(key=lambda pair: pair[0], reverse=True)
-        return [item for _, item in ranked[: max(1, min(limit, 10))]]
+        memories = [item for _, item in ranked[: max(1, min(limit, 10))]]
+        try:
+            policy = AutonomyStore(self.path).get_learning_policy(workspace_id)
+            hints = list(policy.get("planner_hints") or [])[:5]
+            if hints:
+                memories.append(
+                    {
+                        "id": "adaptive-policy",
+                        "query": "adaptive research policy",
+                        "summary": " | ".join(str(item) for item in hints),
+                        "quality_score": 1.0,
+                        "created_at": int(policy.get("updated_at") or time.time()),
+                        "relevance": 1.0,
+                        "memory_kind": "adaptive_policy",
+                        "fresh_evidence": False,
+                        "planner_hints": hints,
+                        "observations": int(policy.get("observations", 0)),
+                    }
+                )
+        except Exception:
+            pass
+        return memories
 
     def remember(
         self,
@@ -122,13 +205,26 @@ class CognitiveMemory:
         workspace_id: str,
     ) -> str:
         memory_id = "mem_" + uuid.uuid4().hex[:20]
-        claims = [str(row.get("text") or "") for row in report.get("claims", [])[:5] if isinstance(row, dict)]
-        ideas = [str(row.get("title") or "") for row in report.get("developed_ideas", [])[:4] if isinstance(row, dict)]
-        timeline = [str(row.get("title") or "") for row in report.get("historical_timeline", [])[:5] if isinstance(row, dict)]
+        claims = [
+            str(row.get("text") or "")
+            for row in report.get("claims", [])[:5]
+            if isinstance(row, dict)
+        ]
+        ideas = [
+            str(row.get("title") or "")
+            for row in report.get("developed_ideas", [])[:4]
+            if isinstance(row, dict)
+        ]
+        timeline = [
+            str(row.get("title") or "")
+            for row in report.get("historical_timeline", [])[:5]
+            if isinstance(row, dict)
+        ]
         parts = [str(report.get("bluf") or ""), *claims, *timeline, *ideas]
         summary = " | ".join(part.strip() for part in parts if part.strip())[:6000]
         topics = sorted(_tokens(query + " " + summary))[:80]
         quality = _clamp(float(evaluation.get("score", 0.0)))
+        now = int(time.time())
         with self._lock, self._connect() as conn:
             conn.execute(
                 "INSERT INTO cognitive_memories VALUES (?, ?, ?, ?, ?, ?, ?)",
@@ -139,9 +235,60 @@ class CognitiveMemory:
                     summary,
                     json.dumps(topics, ensure_ascii=False),
                     quality,
-                    int(time.time()),
+                    now,
                 ),
             )
+            for row in report.get("claims", [])[:40]:
+                if not isinstance(row, dict):
+                    continue
+                text = str(row.get("text") or "").strip()
+                evidence_ids = [
+                    str(item) for item in row.get("evidence_ids", []) if str(item)
+                ][:24]
+                if len(text) < 8 or not evidence_ids:
+                    continue
+                normalized = " ".join(text.lower().split())
+                fact_key = hashlib.sha256(normalized.encode("utf-8")).hexdigest()[:32]
+                confidence = _clamp(float(row.get("confidence", quality)))
+                existing = conn.execute(
+                    "SELECT evidence_ids_json, confidence, occurrences, first_seen_at "
+                    "FROM cognitive_facts WHERE fact_key=? AND workspace_id=?",
+                    (fact_key, workspace_id),
+                ).fetchone()
+                if existing:
+                    prior_ids = json.loads(existing["evidence_ids_json"] or "[]")
+                    merged_ids = list(dict.fromkeys([*prior_ids, *evidence_ids]))[:48]
+                    occurrences = int(existing["occurrences"]) + 1
+                    merged_confidence = _clamp(
+                        (float(existing["confidence"]) * (occurrences - 1) + confidence)
+                        / occurrences
+                    )
+                    conn.execute(
+                        "UPDATE cognitive_facts SET text=?, evidence_ids_json=?, confidence=?, "
+                        "occurrences=?, last_seen_at=? WHERE fact_key=? AND workspace_id=?",
+                        (
+                            text,
+                            json.dumps(merged_ids, ensure_ascii=False),
+                            merged_confidence,
+                            occurrences,
+                            now,
+                            fact_key,
+                            workspace_id,
+                        ),
+                    )
+                else:
+                    conn.execute(
+                        "INSERT INTO cognitive_facts VALUES (?, ?, ?, ?, ?, 1, ?, ?)",
+                        (
+                            fact_key,
+                            workspace_id,
+                            text,
+                            json.dumps(evidence_ids, ensure_ascii=False),
+                            confidence,
+                            now,
+                            now,
+                        ),
+                    )
             conn.commit()
         return memory_id
 
@@ -160,6 +307,10 @@ class CognitiveMemory:
                 ),
             )
             conn.commit()
+        try:
+            AutonomyStore(self.path).observe_evaluation(workspace_id, evaluation)
+        except Exception:
+            pass
         return evaluation_id
 
 
@@ -195,11 +346,21 @@ def build_cognitive_plan(query: str, memories: list[dict[str, Any]]) -> dict[str
     if _asks_ideas(q):
         criteria.append("Develop testable ideas with rationale, risks, confidence and next experiment.")
 
+    policy_hints: list[str] = []
+    for item in memories:
+        if item.get("memory_kind") != "adaptive_policy":
+            continue
+        policy_hints.extend(str(hint) for hint in item.get("planner_hints", []) if str(hint))
+    for hint in list(dict.fromkeys(policy_hints))[:5]:
+        if hint not in criteria:
+            criteria.append(hint)
+
     return {
         "complexity": complexity,
         "objectives": objectives,
         "success_criteria": criteria,
-        "memory_hits": len(memories),
+        "memory_hits": len([item for item in memories if item.get("memory_kind") != "adaptive_policy"]),
+        "policy_hints": list(dict.fromkeys(policy_hints))[:5],
         "adaptation_policy": {
             "max_refinement_passes": 1,
             "new_external_tool_calls_during_refinement": 0,
