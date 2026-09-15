@@ -1,0 +1,116 @@
+{
+  "providers": [
+    {
+      "provider_id": "wikipedia_tr",
+      "domains": ["general", "encyclopedia", "history", "people", "places"],
+      "description": "Turkish Wikipedia as a universal read-only fallback for ORBYTHRA Deep Search.",
+      "transport": "get_json",
+      "keywords": ["kimdir", "nedir", "hakkında", "tarih", "tarihi", "nerede", "who is", "what is", "history"],
+      "provider": "wikipedia",
+      "priority": 60,
+      "fallback": true,
+      "freshness": "stable",
+      "url": "https://tr.wikipedia.org/w/api.php",
+      "query_param": "srsearch",
+      "static_params": {
+        "action": "query",
+        "list": "search",
+        "format": "json",
+        "utf8": "1",
+        "srlimit": "10"
+      },
+      "commercial_use": "review",
+      "terms_url": "https://foundation.wikimedia.org/wiki/Policy:Terms_of_Use",
+      "attribution": "Preserve Wikimedia/Wikipedia attribution and source links."
+    },
+    {
+      "provider_id": "wikipedia_en",
+      "domains": ["general", "encyclopedia", "history", "people", "places", "global"],
+      "description": "English Wikipedia as a universal global read-only fallback for ORBYTHRA Deep Search.",
+      "transport": "get_json",
+      "keywords": ["who is", "what is", "history", "about", "where is", "when did", "biography"],
+      "provider": "wikipedia",
+      "priority": 59,
+      "fallback": true,
+      "freshness": "stable",
+      "url": "https://en.wikipedia.org/w/api.php",
+      "query_param": "srsearch",
+      "static_params": {
+        "action": "query",
+        "list": "search",
+        "format": "json",
+        "utf8": "1",
+        "srlimit": "10"
+      },
+      "commercial_use": "review",
+      "terms_url": "https://foundation.wikimedia.org/wiki/Policy:Terms_of_Use",
+      "attribution": "Preserve Wikimedia/Wikipedia attribution and source links."
+    },
+    {
+      "provider_id": "wikidata_global",
+      "domains": ["general", "entities", "knowledge_graph", "global"],
+      "description": "Wikidata entity search for globally resolvable people, organizations, places and concepts.",
+      "transport": "get_json",
+      "keywords": ["entity", "kişi", "kurum", "şirket", "company", "organization", "person", "place", "yer"],
+      "provider": "wikidata",
+      "priority": 58,
+      "fallback": true,
+      "freshness": "mixed",
+      "url": "https://www.wikidata.org/w/api.php",
+      "query_param": "search",
+      "static_params": {
+        "action": "wbsearchentities",
+        "language": "en",
+        "uselang": "en",
+        "format": "json",
+        "limit": "10",
+        "type": "item"
+      },
+      "commercial_use": "review",
+      "terms_url": "https://www.wikidata.org/wiki/Wikidata:Copyright",
+      "attribution": "Preserve Wikidata entity identifiers and attribution."
+    },
+    {
+      "provider_id": "gdelt_news_global",
+      "domains": ["news", "current_events", "global", "web"],
+      "description": "GDELT global news discovery for current and recent-event queries.",
+      "transport": "get_json",
+      "keywords": ["haber", "news", "son dakika", "breaking", "latest", "güncel", "today", "bugün", "recent", "development", "gelişme"],
+      "provider": "gdelt",
+      "priority": 88,
+      "fallback": false,
+      "freshness": "fresh",
+      "url": "https://api.gdeltproject.org/api/v2/doc/doc",
+      "query_param": "query",
+      "static_params": {
+        "mode": "ArtList",
+        "format": "json",
+        "maxrecords": "25",
+        "sort": "HybridRel"
+      },
+      "commercial_use": "review",
+      "terms_url": "https://www.gdeltproject.org/",
+      "attribution": "Preserve GDELT and original publisher/source attribution."
+    },
+    {
+      "provider_id": "europe_pmc",
+      "domains": ["science", "research", "biomedicine", "health", "academic"],
+      "description": "Europe PMC scholarly and biomedical literature search.",
+      "transport": "get_json",
+      "keywords": ["bilim", "bilimsel", "araştırma", "research", "paper", "makale", "study", "gen", "gene", "protein", "disease", "hastalık", "medicine", "medical"],
+      "provider": "europe_pmc",
+      "priority": 84,
+      "fallback": false,
+      "freshness": "mixed",
+      "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search",
+      "query_param": "query",
+      "static_params": {
+        "format": "json",
+        "pageSize": "10"
+      },
+      "commercial_use": "review",
+      "terms_url": "https://europepmc.org/",
+      "attribution": "Preserve Europe PMC, DOI/PMID and publisher attribution."
+    }
+  ]
+}
