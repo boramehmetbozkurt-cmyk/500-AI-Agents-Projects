@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# Local configuration. osiris_ai_fusion/scripts/scan_secrets.py already fails the
+# build if one of these is committed; ignoring them stops it happening at all.
+.env
+.env.local
+.env.production
+
+# Runtime state a local run writes next to the code: FUSION_STORE_PATH defaults
+# to fusion.sqlite3 and SEAL_REPLAY_DB to .seal_replay.sqlite3.
+*.sqlite3
+*.sqlite3-journal
+*.sqlite3-wal
+*.sqlite3-shm
+
+# Build, benchmark and data-room output
+dist/
+osiris_ai_fusion/data/
+
+# Node / web
+node_modules/
