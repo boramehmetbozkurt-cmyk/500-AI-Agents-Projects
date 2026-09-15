@@ -1,0 +1,51 @@
+{
+  "product": "ORBYTHRA Verifiable Temporal Reality Operating System",
+  "release_label": "Level 9 engineering and product readiness",
+  "claim_boundary": "This is an internal engineering/product-readiness classification, not a claim of AGI, market traction, patent monopoly, or third-party certification.",
+  "engineering_code_commit": "5005f55249a41c334f468a4e806d2a198db34400",
+  "documentation_commit": "6d342f314c5f4d4b8ecf75f37436920e9607f685",
+  "production_entrypoint": "app_level9:app",
+  "application_version": "1.4.0",
+  "internal_readiness": {
+    "technical_architecture": 9.6,
+    "research_intelligence": 9.5,
+    "productization": 9.3,
+    "memory_adaptation": 9.2,
+    "security_verification": 9.2,
+    "defensibility_moat": 9.1,
+    "commercial_readiness": 9.1,
+    "minimum": 9.1,
+    "average": 9.29
+  },
+  "new_release_controls": [
+    "persistent operator router is mounted by the production Python entrypoint",
+    "enterprise readiness and moat contracts are exposed as authenticated APIs",
+    "tenant-isolated pilot KPI ledger records only actual entered measurements",
+    "domain-separated knowledge fingerprint identifies canonical evidence/report bundles",
+    "internal scores explicitly exclude customer traction and independent validation"
+  ],
+  "existing_core_controls_retained": [
+    "evidence-first multi-stage research graph",
+    "provider federation",
+    "historical timeline and server-resolved spatial evidence",
+    "tenant episodic and consolidated fact memory",
+    "memory is not treated as fresh evidence",
+    "self-evaluation with a maximum of one bounded refinement pass",
+    "persistent goals and evaluation-derived planner policy",
+    "approval-gated side effects",
+    "integrity receipts and replay protection",
+    "rate limiting, health/readiness endpoints, metrics and SLO reporting"
+  ],
+  "external_proof": {
+    "score": null,
+    "status": "unscored-until-real-evidence-exists",
+    "required_next_evidence": [
+      "repeated live benchmark sample",
+      "multi-week production SLO history",
+      "independent penetration test and model evaluation",
+      "real paid-pilot task success and human acceptance",
+      "real customer revenue and retention",
+      "authorized connector performance for connected side-effect services"
+    ]
+  }
+}
