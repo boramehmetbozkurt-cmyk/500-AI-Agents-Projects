@@ -1,6 +1,12 @@
 name: ORBYTHRA Public Demo
 
 on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "orbythra_live_demo/**"
+      - ".github/workflows/orbythra-pages.yml"
   push:
     branches:
       - osiris-fusion-v1-release
