@@ -52,7 +52,7 @@ jobs:
             --base-url "$ORBYTHRA_BENCHMARK_BASE_URL" \
             --suite benchmarks/strategic_ai_validation_v1.json \
             --timeout 90 \
-            --concurrency 3 \
+            --concurrency 1 \
             --output ../dist/strategic-ai-validation/result.json
           code=$?
           echo "exit_code=$code" >> "$GITHUB_OUTPUT"
@@ -83,6 +83,7 @@ jobs:
               f"- Suite: `{r.get('suite')}`",
               f"- Transport: `{r.get('transport')}`",
               f"- Live app: `{r.get('base_url')}{r.get('browser_entry')}`",
+              f"- Capability-test concurrency: **{r.get('concurrency')}**",
               f"- Executed cases: **{r.get('executed_cases')}**",
               f"- Passed cases: **{r.get('passed_cases')}**",
               f"- Pass rate: **{float(r.get('pass_rate', 0))*100:.1f}%**",
@@ -93,6 +94,7 @@ jobs:
               "",
               "## Claim boundary",
               "",
+              "This is a single-session capability benchmark. Concurrent-load and SLO evidence are measured separately by the production evidence/resilience workflows.",
               str(r.get("claim_boundary") or "First-party production benchmark only."),
               "",
               "## Cases",
