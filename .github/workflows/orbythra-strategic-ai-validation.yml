@@ -77,6 +77,9 @@ jobs:
               raise SystemExit(0)
           r = json.loads(result_path.read_text(encoding="utf-8"))
           passed = bool(r.get("suite_passed"))
+          blocked = bool(r.get("budget_blocked"))
+          overall = r.get("overall_score")
+          overall_text = "N/A (platform budget blocked)" if overall is None else f"{float(overall):.3f}"
           lines = [
               "# ORBYTHRA Strategic AI Validation",
               "",
@@ -84,24 +87,32 @@ jobs:
               f"- Transport: `{r.get('transport')}`",
               f"- Live app: `{r.get('base_url')}{r.get('browser_entry')}`",
               f"- Capability-test concurrency: **{r.get('concurrency')}**",
-              f"- Executed cases: **{r.get('executed_cases')}**",
-              f"- Passed cases: **{r.get('passed_cases')}**",
-              f"- Pass rate: **{float(r.get('pass_rate', 0))*100:.1f}%**",
-              f"- Overall score: **{float(r.get('overall_score', 0)):.3f}**",
+              f"- Executed requests: **{r.get('executed_cases')}**",
+              f"- Scored cases: **{r.get('scored_cases')}**",
+              f"- Skipped after block: **{r.get('skipped_cases')}**",
+              f"- Passed scored cases: **{r.get('passed_cases')}**",
+              f"- Pass rate over scored cases: **{float(r.get('pass_rate', 0))*100:.1f}%**",
+              f"- Overall score: **{overall_text}**",
               f"- Minimum required score: **{float(r.get('minimum_overall_score', 0)):.2f}**",
-              f"- Median latency: **{r.get('median_latency_ms')} ms**",
+              f"- Median executed-request latency: **{r.get('median_latency_ms')} ms**",
+              f"- Platform budget blocked: **{str(blocked).upper()}**",
               f"- Suite passed: **{str(passed).upper()}**",
               "",
               "## Claim boundary",
               "",
-              "This is a single-session capability benchmark. Concurrent-load and SLO evidence are measured separately by the production evidence/resilience workflows.",
+              "This is a single-session capability benchmark. Concurrent-load and SLO evidence are measured separately by the production evidence/resilience workflows. A platform token-budget block is not converted into a zero model-quality score, and it still prevents a pass claim.",
               str(r.get("claim_boundary") or "First-party production benchmark only."),
               "",
               "## Cases",
               "",
           ]
           for case in r.get("results", []):
-              status = "PASS" if case.get("passed") else "FAIL"
+              if case.get("skipped"):
+                  status = "BLOCKED/SKIPPED"
+              elif case.get("blocked"):
+                  status = "BUDGET BLOCKED"
+              else:
+                  status = "PASS" if case.get("passed") else "FAIL"
               lines.append(
                   f"- `{case.get('id')}` — **{status}**, score={case.get('score')}, latency={case.get('latency_ms')} ms"
               )
