@@ -1,0 +1,80 @@
+{
+  "schema": "orbythra.strategic-validation-evidence.v1",
+  "recorded_date": "2026-09-16",
+  "product": "ORBYTHRA Adaptive Core",
+  "claim_boundary": "This is first-party live production evidence, not an independent OpenAI, Anthropic, academic, security, or AGI certification. A platform token-budget block is not scored as model-quality evidence and prevents a full-suite pass claim.",
+  "production": {
+    "app_id": "orbythra-adaptive-core-llftzg",
+    "live_url": "https://orbythra-adaptive-core-llftzg.v2.appdeploy.ai/",
+    "snapshot_after_reliability_fixes": "1789536006341",
+    "status": "ready",
+    "qa": {
+      "frontend_errors": 0,
+      "network_errors": 0,
+      "backend_errors": 0
+    }
+  },
+  "last_partially_scored_live_run": {
+    "github_run_id": 35026584165,
+    "artifact_id": 10431895622,
+    "transport": "real-chromium-first-party-app-client",
+    "attempted_cases": 10,
+    "passed_cases": 6,
+    "execution_error_cases": 4,
+    "suite_passed": false,
+    "reported_overall_score_including_execution_errors_as_zero": 0.554,
+    "median_latency_ms": 17427.2,
+    "successful_case_mean_score": 0.9234,
+    "successful_case_score_range": [0.8809, 0.9531],
+    "successful_cases": [
+      {"id": "SV03-spatial-cern", "quality_score": 0.8298, "structural_score": 1.0, "score": 0.8809},
+      {"id": "SV04-comparison-ai-architecture", "quality_score": 0.933, "structural_score": 1.0, "score": 0.9531},
+      {"id": "SV05-testable-ideas", "quality_score": 0.8883, "structural_score": 1.0, "score": 0.9218},
+      {"id": "SV07-cross-domain-battery", "quality_score": 0.9032, "structural_score": 1.0, "score": 0.9322},
+      {"id": "SV08-turkish-grounded", "quality_score": 0.8762, "structural_score": 1.0, "score": 0.9133},
+      {"id": "SV09-bounded-agent", "quality_score": 0.913, "structural_score": 1.0, "score": 0.9391}
+    ],
+    "execution_errors": [
+      {"id": "SV01-evidence-science", "error": "Network Error", "latency_ms": 90590.6},
+      {"id": "SV02-temporal-crispr", "error": "HTTP 502", "latency_ms": 12640.5},
+      {"id": "SV06-uncertain-claim", "error": "HTTP 502", "latency_ms": 12048.9},
+      {"id": "SV10-world-model", "error": "HTTP 502", "latency_ms": 11788.9}
+    ]
+  },
+  "current_platform_block": {
+    "github_run_id": 35059036333,
+    "artifact_id": 10431713016,
+    "classification": "external_platform_budget_block",
+    "code": "ai_daily_token_budget_exceeded",
+    "used_tokens": 500644,
+    "daily_limit_tokens": 500000,
+    "retry_at_utc": "2026-09-17T00:00:00.000Z",
+    "executed_requests": 1,
+    "skipped_after_block": 9,
+    "quality_score": null,
+    "suite_passed": false,
+    "reason_quality_is_unscored": "The live AI runtime rejected the request before research execution because the platform daily token budget was exhausted."
+  },
+  "reliability_fixes_applied": [
+    "fixed benchmark hash parser so SVxx validation mode activates",
+    "fixed frontend-to-backend benchmark id transport using an explicit URL query string",
+    "added fixed-case read-only benchmark route with no memory, policy, or external side-effect writes",
+    "added 8-second upstream evidence-provider timeout",
+    "made Wikipedia, OpenAlex, and GDELT tool failures fail-soft rather than fatal to the full agent loop",
+    "classified daily AI budget exhaustion as HTTP 429 rather than HTTP 502",
+    "disabled pointless AI retry when the daily quota is exhausted",
+    "reduced primary max generation tokens from 5500 to 3800",
+    "reduced bounded refinement max generation tokens from 4800 to 2600",
+    "added a 1800-token FAST structured fallback that uses only already-retrieved evidence",
+    "made bounded refinement fail-soft so a valid first-pass report is preserved if refinement is unavailable",
+    "separated capability validation concurrency from load/SLO testing",
+    "made CI stop after the first daily-budget block and skip remaining cases without mis-scoring them as quality failures"
+  ],
+  "required_next_evidence": [
+    "run the complete 10-case live Chromium suite after the platform budget resets",
+    "require all cases to pass structural checks and the published score gate",
+    "record p50/p95 latency separately from concurrent load and SLO workflows",
+    "repeat the full run enough times to estimate reliability rather than relying on one sample",
+    "obtain independent third-party evaluation for claims beyond first-party production evidence"
+  ]
+}
