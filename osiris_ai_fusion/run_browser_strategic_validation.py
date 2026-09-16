@@ -13,6 +13,12 @@ from playwright.async_api import async_playwright
 from run_adaptive_benchmark import _normalize_result, _requirement_checks
 
 DEFAULT_SUITE = Path(__file__).resolve().parent / "benchmarks" / "strategic_ai_validation_v1.json"
+BUDGET_ERROR_CODE = "ai_daily_token_budget_exceeded"
+
+
+def _is_budget_block(message: str) -> bool:
+    lowered = message.lower()
+    return BUDGET_ERROR_CODE in lowered or "ai daily token budget exceeded" in lowered
 
 
 async def _run_case(browser: Any, base_url: str, case: dict[str, Any], timeout_ms: int) -> dict[str, Any]:
@@ -69,20 +75,25 @@ async def _run_case(browser: Any, base_url: str, case: dict[str, Any], timeout_m
             "score": case_score,
             "checks": checks,
             "passed": case_score >= 0.75 and all(checks.values()),
+            "blocked": False,
             "adaptation": result.get("adaptation"),
             "memory": result.get("memory"),
             "benchmark_boundary": benchmark,
         }
     except Exception as exc:
+        message = str(exc)[:2000]
+        budget_blocked = _is_budget_block(message)
         return {
             "id": case.get("id"),
             "runtime_case_id": case_id,
             "language": case.get("language"),
             "latency_ms": round((time.perf_counter() - started) * 1000, 1),
-            "score": 0.0,
+            "score": None if budget_blocked else 0.0,
             "passed": False,
+            "blocked": budget_blocked,
+            "block_reason": BUDGET_ERROR_CODE if budget_blocked else None,
             "error_type": type(exc).__name__,
-            "error": str(exc)[:1000],
+            "error": message,
         }
     finally:
         await page.close()
@@ -95,46 +106,88 @@ async def run(
     concurrency: int,
 ) -> dict[str, Any]:
     suite = json.loads(suite_path.read_text(encoding="utf-8"))
+    cases = list(suite["cases"])
     timeout_ms = int(timeout * 1000)
-    limit = asyncio.Semaphore(max(1, min(5, concurrency)))
+    effective_concurrency = max(1, min(5, concurrency))
+    results: list[dict[str, Any]] = []
 
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(headless=True)
         try:
-            async def bounded(case: dict[str, Any]) -> dict[str, Any]:
-                async with limit:
-                    return await _run_case(browser, base_url, case, timeout_ms)
+            if effective_concurrency == 1:
+                for index, case in enumerate(cases):
+                    item = await _run_case(browser, base_url, case, timeout_ms)
+                    results.append(item)
+                    if item.get("blocked"):
+                        for remaining in cases[index + 1 :]:
+                            results.append(
+                                {
+                                    "id": remaining.get("id"),
+                                    "runtime_case_id": str(remaining.get("id") or "").split("-", 1)[0].upper(),
+                                    "language": remaining.get("language"),
+                                    "skipped": True,
+                                    "blocked": True,
+                                    "block_reason": BUDGET_ERROR_CODE,
+                                    "passed": False,
+                                    "reason": "Not executed after the live runtime reported daily AI token budget exhaustion.",
+                                }
+                            )
+                        break
+            else:
+                limit = asyncio.Semaphore(effective_concurrency)
 
-            results = await asyncio.gather(*(bounded(case) for case in suite["cases"]))
+                async def bounded(case: dict[str, Any]) -> dict[str, Any]:
+                    async with limit:
+                        return await _run_case(browser, base_url, case, timeout_ms)
+
+                results = await asyncio.gather(*(bounded(case) for case in cases))
         finally:
             await browser.close()
 
-    scores = [float(item.get("score", 0.0)) for item in results]
-    latencies = [float(item["latency_ms"]) for item in results if "latency_ms" in item]
-    passed = sum(1 for item in results if item.get("passed"))
-    overall = statistics.mean(scores) if scores else 0.0
+    budget_blocked = any(item.get("blocked") for item in results)
+    scored = [
+        item
+        for item in results
+        if not item.get("skipped") and not item.get("blocked") and isinstance(item.get("score"), (int, float))
+    ]
+    executed = [item for item in results if not item.get("skipped")]
+    scores = [float(item["score"]) for item in scored]
+    latencies = [float(item["latency_ms"]) for item in executed if "latency_ms" in item]
+    passed = sum(1 for item in scored if item.get("passed"))
+    overall = statistics.mean(scores) if scores else None
     policy = suite.get("pass_policy") or {}
     minimum = float(policy.get("minimum_overall_score", 0.8))
+    suite_passed = bool(
+        not budget_blocked
+        and len(scored) == len(cases)
+        and overall is not None
+        and overall >= minimum
+        and passed == len(cases)
+    )
     return {
         "suite": suite.get("suite"),
         "transport": "real-chromium-first-party-app-client",
         "base_url": base_url,
         "browser_entry": "/#benchmark=<SVxx>",
-        "concurrency": max(1, min(5, concurrency)),
+        "concurrency": effective_concurrency,
         "case_timeout_seconds": timeout,
         "case_count": len(results),
-        "executed_cases": len(results),
-        "skipped_cases": 0,
+        "executed_cases": len(executed),
+        "scored_cases": len(scored),
+        "skipped_cases": sum(1 for item in results if item.get("skipped")),
         "passed_cases": passed,
-        "pass_rate": round(passed / max(1, len(results)), 4),
-        "overall_score": round(overall, 4),
+        "pass_rate": round(passed / max(1, len(scored)), 4),
+        "overall_score": round(overall, 4) if overall is not None else None,
         "median_latency_ms": round(statistics.median(latencies), 1) if latencies else None,
         "minimum_overall_score": minimum,
-        "suite_passed": overall >= minimum and passed == len(results),
+        "budget_blocked": budget_blocked,
+        "block_reason": BUDGET_ERROR_CODE if budget_blocked else None,
+        "suite_passed": suite_passed,
         "claim_boundary": (
             "First-party end-to-end live production benchmark executed through real Chromium, "
             "the public ORBYTHRA frontend, AppDeploy client transport, backend AI/tool loop and rendered result. "
-            "It is not an independent OpenAI, Anthropic, academic, security, or AGI certification."
+            "A platform budget block is reported separately and is not scored as model-quality evidence. "
+            "This is not an independent OpenAI, Anthropic, academic, security, or AGI certification."
         ),
         "results": results,
     }
