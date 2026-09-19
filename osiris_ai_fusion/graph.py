@@ -86,7 +86,13 @@ async def planner_node(state: AgentState) -> AgentState:
     )
     if not plan.tools:
         raise PermissionError("No authorized capability remains after planning")
-    subqueries = await plan_subqueries(state["query"])
+    # A confident System-One route must stay fast end to end. Deterministic
+    # decomposition remains available, but the slow model cannot be re-entered
+    # through the subquery planner after the main planner deliberately skipped it.
+    subqueries = await plan_subqueries(
+        state["query"],
+        allow_model=model.get("fast_path") != "true",
+    )
     return {
         "plan": plan.model_dump(),
         "planned_tools": plan.tools,
