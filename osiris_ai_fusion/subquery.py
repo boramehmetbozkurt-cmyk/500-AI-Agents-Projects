@@ -147,6 +147,7 @@ async def plan_subqueries(
     *,
     max_count: int | None = None,
     max_depth: int | None = None,
+    allow_model: bool = True,
 ) -> list[SubQuery]:
     """Decompose ``query`` recursively, breadth-first, within count and depth caps.
 
@@ -173,7 +174,7 @@ async def plan_subqueries(
         remaining = max_count - len(planned)
         candidates = split_deterministic(parent)
         origin = "deterministic"
-        if not candidates and settings.ai_planner_enabled:
+        if not candidates and allow_model and settings.ai_planner_enabled:
             try:
                 candidates = await _split_with_model(parent, remaining)
                 origin = "model"

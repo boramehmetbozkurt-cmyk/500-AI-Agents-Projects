@@ -11,6 +11,7 @@ from capabilities import (
     resolve_capability_gap,
 )
 from config import get_settings
+from fast_decision import FastDecisionClient
 from llm import ModelRouter
 from osiris_client import READ_ONLY_TOOLS, normalize_tool_name
 from providers import route_providers
@@ -192,10 +193,35 @@ async def build_plan(
     region = caller_region
     time_range = caller_time_range or infer_time_range(query)
     question_type = infer_question_type(query)
-    model_meta = {"provider": "deterministic", "model": "provider-federation-router-v3-deep"}
+    decision_result = await FastDecisionClient().decide(query, tools, scope)
+    decision = decision_result.decision
+    if decision.action == "deny":
+        raise PermissionError("Fast decision policy denied the read-only request")
+    if decision.selected_tools:
+        tools = decision.selected_tools
+    model_meta = {
+        "provider": decision_result.provider,
+        "model": decision_result.model,
+        "decision": decision.action,
+        "decision_confidence": f"{decision.confidence:.3f}",
+        "decision_risk": f"{decision.risk_score:.3f}",
+        "decision_fallback": decision_result.fallback_reason or "none",
+        "fast_path": "false",
+    }
     deterministic_external = "provider_federation" in tools
 
-    if settings.ai_planner_enabled and requested_tools is None:
+    use_slow_planner = (
+        settings.ai_planner_enabled
+        and requested_tools is None
+        and (
+            decision.action == "escalate"
+            or decision.needs_reasoning
+            or decision.confidence < settings.fast_decision_min_confidence
+        )
+    )
+    if not use_slow_planner:
+        model_meta["fast_path"] = "true"
+    if use_slow_planner:
         system = (
             "You are ORBYTHRA's bilingual Universal Deep Search planner. Return only "
             "JSON matching the schema. Select only from AVAILABLE_TOOLS and use the "
@@ -245,6 +271,13 @@ async def build_plan(
                 model_meta = {
                     "provider": model_result.provider,
                     "model": model_result.model,
+                    "fast_decision_provider": decision_result.provider,
+                    "fast_decision_model": decision_result.model,
+                    "decision": decision.action,
+                    "decision_confidence": f"{decision.confidence:.3f}",
+                    "decision_risk": f"{decision.risk_score:.3f}",
+                    "decision_fallback": decision_result.fallback_reason or "none",
+                    "fast_path": "false",
                 }
         except Exception:
             pass

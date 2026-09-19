@@ -54,6 +54,27 @@ class TestPlanSubqueries:
         get_settings.cache_clear()
         assert await plan_subqueries("a? b? c?") == []
 
+    async def test_fast_path_never_calls_model_splitter(self, monkeypatch):
+        monkeypatch.setenv("AI_PLANNER_ENABLED", "true")
+        get_settings.cache_clear()
+
+        async def forbidden(*args, **kwargs):
+            raise AssertionError("slow model must not run on the fast path")
+
+        monkeypatch.setattr("subquery._split_with_model", forbidden)
+        assert await plan_subqueries(
+            "İzmir'de bugün hava nasıl",
+            allow_model=False,
+        ) == []
+
+    async def test_fast_path_keeps_safe_deterministic_decomposition(self):
+        planned = await plan_subqueries(
+            "İzmir'de deprem riski nedir? Muğla'da yangın riski nedir?",
+            allow_model=False,
+        )
+        assert planned
+        assert all(item.origin == "deterministic" for item in planned)
+
     async def test_subqueries_are_derived_from_a_compound_question(self):
         planned = await plan_subqueries(
             "İzmir'de deprem riski nedir? Muğla'da orman yangını riski nedir?"

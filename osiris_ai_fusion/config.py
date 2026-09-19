@@ -111,6 +111,28 @@ class Settings:
     ai_planner_enabled: bool = field(
         default_factory=lambda: _bool("AI_PLANNER_ENABLED", True)
     )
+    fast_decision_enabled: bool = field(
+        default_factory=lambda: _bool("FAST_DECISION_ENABLED", False)
+    )
+    fast_decision_base_url: str = field(
+        default_factory=lambda: os.getenv("FAST_DECISION_BASE_URL", "").rstrip("/")
+    )
+    fast_decision_api_key: str = field(
+        default_factory=lambda: os.getenv("FAST_DECISION_API_KEY", "").strip(),
+        repr=False,
+    )
+    fast_decision_model: str = field(
+        default_factory=lambda: os.getenv("FAST_DECISION_MODEL", "jev").strip()
+    )
+    fast_decision_path: str = field(
+        default_factory=lambda: os.getenv("FAST_DECISION_PATH", "/decision").strip()
+    )
+    fast_decision_timeout_seconds: float = field(
+        default_factory=lambda: _float("FAST_DECISION_TIMEOUT_SECONDS", 1.5)
+    )
+    fast_decision_min_confidence: float = field(
+        default_factory=lambda: _float("FAST_DECISION_MIN_CONFIDENCE", 0.75)
+    )
     tool_timeout_seconds: float = field(
         default_factory=lambda: _float("TOOL_TIMEOUT_SECONDS", 20.0)
     )
@@ -217,6 +239,16 @@ class Settings:
                 raise RuntimeError("Missing required production settings: " + ", ".join(missing))
         if self.max_parallel_tools < 1:
             raise RuntimeError("MAX_PARALLEL_TOOLS must be >= 1")
+        if self.fast_decision_enabled and not self.fast_decision_base_url:
+            raise RuntimeError(
+                "FAST_DECISION_BASE_URL is required when FAST_DECISION_ENABLED=true"
+            )
+        if not self.fast_decision_path.startswith("/"):
+            raise RuntimeError("FAST_DECISION_PATH must start with /")
+        if self.fast_decision_timeout_seconds <= 0:
+            raise RuntimeError("FAST_DECISION_TIMEOUT_SECONDS must be > 0")
+        if not 0.0 <= self.fast_decision_min_confidence <= 1.0:
+            raise RuntimeError("FAST_DECISION_MIN_CONFIDENCE must be between 0 and 1")
         if self.subquery_max_count < 0:
             raise RuntimeError("SUBQUERY_MAX_COUNT must be >= 0")
         if self.subquery_max_count > 12:
