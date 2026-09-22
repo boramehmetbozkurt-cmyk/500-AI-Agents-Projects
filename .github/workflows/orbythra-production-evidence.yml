@@ -25,7 +25,7 @@ jobs:
   production-evidence:
     runs-on: ubuntu-latest
     env:
-      ORBYTHRA_PRODUCTION_BASE_URL: ${{ vars.ORBYTHRA_PRODUCTION_BASE_URL }}
+      ORBYTHRA_PRODUCTION_BASE_URL: ${{ vars.ORBYTHRA_PRODUCTION_BASE_URL || 'https://orbythra-adaptive-core-llftzg.v2.appdeploy.ai' }}
       ORBYTHRA_PRODUCTION_API_KEY: ${{ secrets.ORBYTHRA_PRODUCTION_API_KEY }}
     steps:
       - name: Checkout
@@ -59,6 +59,7 @@ jobs:
               encoding="utf-8",
           )
           PY
+          exit 1
 
       - name: Probe production
         if: ${{ env.ORBYTHRA_PRODUCTION_BASE_URL != '' }}
