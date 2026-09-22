@@ -22,7 +22,10 @@ def test_engineering_audit_requires_core_sections_and_modes():
     karar
     2. GEREKÇE
     gerekçe
-    TOPRAK SU ATEŞ HAVA
+    TOPRAK
+    SU
+    ATEŞ
+    HAVA
     FMEA
     DOĞRULAMA
     9. BİLİNMEYENLER
@@ -32,6 +35,24 @@ def test_engineering_audit_requires_core_sections_and_modes():
     assert audit["required_sections_complete"] is True
     assert audit["four_modes_complete"] is True
     assert audit["verification_complete"] is True
+    assert audit["structure_valid"] is True
+
+
+def test_engineering_audit_does_not_count_prose_mentions_as_sections():
+    answer = "FMEA ve DOĞRULAMA yapmalıyız. TOPRAK SU ATEŞ HAVA. 1. KARAR ve 2. GEREKÇE gerekli. 9. BİLİNMEYENLER de var."
+    audit = audit_engineering_answer(answer)
+    assert audit["structure_valid"] is False
+    assert audit["required_sections_complete"] is False
+
+
+@pytest.mark.asyncio
+async def test_failed_repair_is_reported_as_invalid(monkeypatch):
+    async def fake_generate(self, system, prompt, json_schema=None):
+        return ModelResult(text="FMEA, DOĞRULAMA, TOPRAK, SU, ATEŞ, HAVA", provider="test", model="test-model")
+
+    monkeypatch.setattr(engineering.ModelRouter, "generate", fake_generate)
+    result = await engineering.analyze_engineering_problem(EngineeringProblem(problem="Bir bileşeni tasarla"))
+    assert result.audit["structure_valid"] is False
 
 
 @pytest.mark.asyncio

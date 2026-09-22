@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Annotated, Any
 
@@ -95,11 +96,29 @@ def _user_prompt(body: EngineeringProblem) -> str:
 
 
 def audit_engineering_answer(answer: str) -> dict[str, bool]:
-    upper = answer.upper()
-    audit = {marker: marker in upper for marker in REQUIRED_MARKERS + AUDIT_MARKERS}
+    # A mention in a paragraph (or the user's question echoed back) is not a section.
+    headings = []
+    for line in answer.splitlines():
+        normalized = re.sub(r"^[\s#*_-]+", "", line).strip().upper()
+        normalized = re.sub(r"\*", "", normalized).rstrip(": ")
+        headings.append(normalized)
+    audit = {
+        marker: any(
+            heading == marker or heading.startswith(marker + " — ")
+            or heading.startswith(marker + " - ") or heading.startswith(marker + ":")
+            or heading.startswith(marker + " /")
+            for heading in headings
+        )
+        for marker in REQUIRED_MARKERS + AUDIT_MARKERS
+    }
     audit["required_sections_complete"] = all(audit[m] for m in REQUIRED_MARKERS)
     audit["four_modes_complete"] = all(audit[m] for m in ("TOPRAK", "SU", "ATEŞ", "HAVA"))
     audit["verification_complete"] = audit["FMEA"] and audit["DOĞRULAMA"]
+    audit["structure_valid"] = (
+        audit["required_sections_complete"]
+        and audit["four_modes_complete"]
+        and audit["verification_complete"]
+    )
     return audit
 
 
@@ -110,11 +129,7 @@ async def analyze_engineering_problem(body: EngineeringProblem) -> EngineeringRe
     result = await router.generate(system, prompt)
     audit = audit_engineering_answer(result.text)
 
-    if not (
-        audit["required_sections_complete"]
-        and audit["four_modes_complete"]
-        and audit["verification_complete"]
-    ):
+    if not audit["structure_valid"]:
         repair = (
             prompt
             + "\n\nQUALITY-GATE REPAIR: Önceki çıktı zorunlu denetimi geçmedi. "
@@ -124,6 +139,8 @@ async def analyze_engineering_problem(body: EngineeringProblem) -> EngineeringRe
         )
         result = await router.generate(system, repair)
         audit = audit_engineering_answer(result.text)
+
+    # Keep the answer visible for diagnosis, but never label a failed repair as valid.
 
     return EngineeringResult(
         product="ORBYTHRA",
