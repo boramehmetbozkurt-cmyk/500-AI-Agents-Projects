@@ -153,6 +153,11 @@ class SaaSManager:
                     PRIMARY KEY(tenant_id, period, metric),
                     FOREIGN KEY(tenant_id) REFERENCES saas_tenants(id) ON DELETE CASCADE
                 );
+                CREATE TABLE IF NOT EXISTS saas_billing_events (
+                    event_id TEXT PRIMARY KEY,
+                    tenant_id TEXT NOT NULL,
+                    processed_at INTEGER NOT NULL
+                );
                 CREATE INDEX IF NOT EXISTS idx_saas_session_token
                     ON saas_sessions(token_hash, expires_at);
                 CREATE INDEX IF NOT EXISTS idx_saas_api_key_hash
@@ -532,6 +537,7 @@ class SaaSManager:
     def process_stripe_webhook(self, payload: bytes, signature: str) -> dict[str, Any]:
         self._verify_stripe_signature(payload, signature)
         event = json.loads(payload)
+        event_id = str(event.get("id") or "")
         event_type = str(event.get("type", ""))
         obj = ((event.get("data") or {}).get("object") or {})
         metadata = obj.get("metadata") or {}
@@ -539,11 +545,21 @@ class SaaSManager:
         plan = str(metadata.get("plan") or "free")
         if plan not in {"free", "pro", "team"}:
             plan = "free"
-        if not tenant_id:
+        if not event_id or not tenant_id:
+            return {"received": True, "updated": False, "type": event_type}
+        if event_type == "checkout.session.completed" and (
+            obj.get("mode") != "subscription"
+            or obj.get("status") != "complete"
+            or obj.get("payment_status") not in {"paid", "no_payment_required"}
+        ):
             return {"received": True, "updated": False, "type": event_type}
         status = str(obj.get("status") or "active")
         if event_type == "customer.subscription.deleted":
             plan, status = "free", "canceled"
+        elif event_type.startswith("customer.subscription.") and status not in {
+            "active", "trialing"
+        }:
+            plan = "free"
         if event_type in {
             "checkout.session.completed",
             "customer.subscription.created",
@@ -551,14 +567,41 @@ class SaaSManager:
             "customer.subscription.deleted",
         }:
             customer = obj.get("customer")
+            if not isinstance(customer, str) or not customer:
+                return {"received": True, "updated": False, "type": event_type}
             with self._lock, self._connect() as conn:
-                conn.execute(
+                if conn.execute(
+                    "SELECT 1 FROM saas_billing_events WHERE event_id=?", (event_id,)
+                ).fetchone():
+                    return {"received": True, "updated": False, "type": event_type}
+                tenant = conn.execute(
+                    "SELECT stripe_customer_id FROM saas_tenants WHERE id=?", (tenant_id,)
+                ).fetchone()
+                other = conn.execute(
+                    "SELECT 1 FROM saas_tenants WHERE stripe_customer_id=? AND id<>?",
+                    (customer, tenant_id),
+                ).fetchone()
+                if tenant is None or other or (
+                    tenant["stripe_customer_id"] and tenant["stripe_customer_id"] != customer
+                ):
+                    return {"received": True, "updated": False, "type": event_type}
+                # Subscription events may arrive before Checkout; defer entitlement until
+                # the server-created Checkout session binds this customer to the tenant.
+                if event_type != "checkout.session.completed" and not tenant["stripe_customer_id"]:
+                    return {"received": True, "updated": False, "type": event_type}
+                cursor = conn.execute(
                     """
                     UPDATE saas_tenants
                     SET plan=?, subscription_status=?, stripe_customer_id=COALESCE(?, stripe_customer_id), updated_at=?
                     WHERE id=?
                     """,
                     (plan, status, customer, int(time.time()), tenant_id),
+                )
+                if cursor.rowcount != 1:
+                    return {"received": True, "updated": False, "type": event_type}
+                conn.execute(
+                    "INSERT INTO saas_billing_events(event_id, tenant_id, processed_at) VALUES (?, ?, ?)",
+                    (event_id, tenant_id, int(time.time())),
                 )
                 conn.commit()
             return {"received": True, "updated": True, "type": event_type, "plan": plan}

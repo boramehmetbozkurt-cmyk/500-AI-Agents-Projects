@@ -65,6 +65,7 @@ def test_pilot_metrics_are_tenant_isolated_and_measured(tmp_path) -> None:
         ),
     )
     assert updated["completion_ratio"] == 0.5
-    assert updated["evidence_status"] == "measured"
+    assert updated["evidence_status"] == "self-reported-unverified"
+    assert "user-entered" in updated["evidence_note"]
     assert updated["quality_index"] == 0.9267
     assert store.list("tenant-b") == []
