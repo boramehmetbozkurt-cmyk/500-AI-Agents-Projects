@@ -280,7 +280,12 @@ class EnterpriseProofStore:
         ]
         item["quality_index"] = round(sum(available) / len(available), 4) if available else None
         item["evidence_status"] = (
-            "measured" if item["completed_tasks"] > 0 and available else "awaiting-real-pilot-data"
+            "self-reported-unverified"
+            if item["completed_tasks"] > 0 and available
+            else "awaiting-real-pilot-data"
+        )
+        item["evidence_note"] = (
+            "Pilot metrics are user-entered; this ledger does not verify task records or customer sign-off."
         )
         return item
 
