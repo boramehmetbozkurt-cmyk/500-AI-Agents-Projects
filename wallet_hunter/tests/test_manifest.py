@@ -11,6 +11,8 @@ from __future__ import annotations
 
 import json
 
+import httpx
+
 from wallet_hunter.config import settings
 from wallet_hunter.models import WalletScanRequest
 from wallet_hunter.providers import PROJECT_DIR, ManifestOpportunityProvider
@@ -87,6 +89,24 @@ async def test_scan_warns_when_the_manifest_is_missing(tmp_path, monkeypatch):
     assert report.opportunities == []
     assert any("no-such-manifest.json" in warning for warning in report.warnings)
     assert any("Unsupported chains ignored" in warning for warning in report.warnings)
+
+
+async def test_unsupported_only_scan_never_initializes_http_client(tmp_path, monkeypatch):
+    monkeypatch.setattr(settings, "wallet_hunter_opportunities", "opportunities.example.json")
+    monkeypatch.chdir(tmp_path)
+
+    class UnexpectedClient:
+        def __init__(self, *args, **kwargs):
+            raise AssertionError("offline scan initialized an HTTP client")
+
+    monkeypatch.setattr(httpx, "AsyncClient", UnexpectedClient)
+
+    report = await WalletScanner().scan(
+        WalletScanRequest(address="0x" + "ab" * 20, chains=["not-a-chain"])
+    )
+
+    assert report.chains == []
+    assert report.opportunities == []
 
 
 async def test_scan_does_not_warn_when_the_manifest_is_present(tmp_path, monkeypatch):
