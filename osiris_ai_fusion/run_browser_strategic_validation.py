@@ -14,11 +14,23 @@ from run_adaptive_benchmark import _normalize_result, _requirement_checks
 
 DEFAULT_SUITE = Path(__file__).resolve().parent / "benchmarks" / "strategic_ai_validation_v1.json"
 BUDGET_ERROR_CODE = "ai_daily_token_budget_exceeded"
+PLATFORM_UNAVAILABLE_CODE = "app_temporarily_unavailable"
 
 
 def _is_budget_block(message: str) -> bool:
     lowered = message.lower()
     return BUDGET_ERROR_CODE in lowered or "ai daily token budget exceeded" in lowered
+
+
+def _platform_block_reason(message: str) -> str | None:
+    lowered = message.lower()
+    if _is_budget_block(message):
+        return BUDGET_ERROR_CODE
+    if PLATFORM_UNAVAILABLE_CODE in lowered or (
+        "status code 402" in lowered and "temporarily unavailable" in lowered
+    ):
+        return PLATFORM_UNAVAILABLE_CODE
+    return None
 
 
 async def _run_case(browser: Any, base_url: str, case: dict[str, Any], timeout_ms: int) -> dict[str, Any]:
@@ -82,16 +94,16 @@ async def _run_case(browser: Any, base_url: str, case: dict[str, Any], timeout_m
         }
     except Exception as exc:
         message = str(exc)[:2000]
-        budget_blocked = _is_budget_block(message)
+        block_reason = _platform_block_reason(message)
         return {
             "id": case.get("id"),
             "runtime_case_id": case_id,
             "language": case.get("language"),
             "latency_ms": round((time.perf_counter() - started) * 1000, 1),
-            "score": None if budget_blocked else 0.0,
+            "score": None if block_reason else 0.0,
             "passed": False,
-            "blocked": budget_blocked,
-            "block_reason": BUDGET_ERROR_CODE if budget_blocked else None,
+            "blocked": block_reason is not None,
+            "block_reason": block_reason,
             "error_type": type(exc).__name__,
             "error": message,
         }
@@ -127,9 +139,9 @@ async def run(
                                     "language": remaining.get("language"),
                                     "skipped": True,
                                     "blocked": True,
-                                    "block_reason": BUDGET_ERROR_CODE,
+                                    "block_reason": item.get("block_reason"),
                                     "passed": False,
-                                    "reason": "Not executed after the live runtime reported daily AI token budget exhaustion.",
+                                    "reason": "Not executed after the live runtime reported a platform availability block.",
                                 }
                             )
                         break
@@ -144,7 +156,11 @@ async def run(
         finally:
             await browser.close()
 
-    budget_blocked = any(item.get("blocked") for item in results)
+    block_reasons = sorted(
+        {str(item["block_reason"]) for item in results if item.get("block_reason")}
+    )
+    platform_blocked = bool(block_reasons)
+    budget_blocked = BUDGET_ERROR_CODE in block_reasons
     scored = [
         item
         for item in results
@@ -158,7 +174,7 @@ async def run(
     policy = suite.get("pass_policy") or {}
     minimum = float(policy.get("minimum_overall_score", 0.8))
     suite_passed = bool(
-        not budget_blocked
+        not platform_blocked
         and len(scored) == len(cases)
         and overall is not None
         and overall >= minimum
@@ -181,7 +197,9 @@ async def run(
         "median_latency_ms": round(statistics.median(latencies), 1) if latencies else None,
         "minimum_overall_score": minimum,
         "budget_blocked": budget_blocked,
-        "block_reason": BUDGET_ERROR_CODE if budget_blocked else None,
+        "platform_blocked": platform_blocked,
+        "block_reasons": block_reasons,
+        "block_reason": block_reasons[0] if len(block_reasons) == 1 else None,
         "suite_passed": suite_passed,
         "claim_boundary": (
             "First-party end-to-end live production benchmark executed through real Chromium, "
