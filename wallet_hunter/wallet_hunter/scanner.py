@@ -30,19 +30,27 @@ class WalletScanner:
         chains = [c for c in request.chains if c in CHAINS]
         unknown = sorted(set(request.chains) - set(chains))
 
-        timeout = httpx.Timeout(settings.wallet_hunter_timeout)
-        async with httpx.AsyncClient(timeout=timeout, follow_redirects=False) as client:
-            results = await asyncio.gather(
-                *(self._scan_chain(client, chain, request.address) for chain in chains)
-            )
-            manifest_provider = ManifestOpportunityProvider()
-            manifest_path = manifest_provider.path()
-            manifest = manifest_provider.load()
-            scoped = self._scope_opportunities(manifest, chains, request.address)
-            checker = OfficialEligibilityProvider(client)
-            checked = await asyncio.gather(
-                *(checker.check(opportunity, request.address) for opportunity in scoped)
-            )
+        manifest_provider = ManifestOpportunityProvider()
+        manifest_path = manifest_provider.path()
+        manifest = manifest_provider.load()
+        scoped = self._scope_opportunities(manifest, chains, request.address)
+
+        results: list[ChainResult] = []
+        checked: list[Opportunity] = []
+        # Do not initialize an HTTP transport when there is no supported chain and
+        # no scoped eligibility URL to query. Besides being wasteful, constructing
+        # httpx with trust_env=True can fail on an optional proxy dependency before
+        # the deliberately offline request has done any work.
+        if chains or scoped:
+            timeout = httpx.Timeout(settings.wallet_hunter_timeout)
+            async with httpx.AsyncClient(timeout=timeout, follow_redirects=False) as client:
+                results = await asyncio.gather(
+                    *(self._scan_chain(client, chain, request.address) for chain in chains)
+                )
+                checker = OfficialEligibilityProvider(client)
+                checked = await asyncio.gather(
+                    *(checker.check(opportunity, request.address) for opportunity in scoped)
+                )
 
         opportunities = self._rank_opportunities(checked, results)
         warnings: list[str] = []
