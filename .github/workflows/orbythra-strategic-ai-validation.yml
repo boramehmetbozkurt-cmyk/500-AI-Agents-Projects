@@ -77,9 +77,9 @@ jobs:
               raise SystemExit(0)
           r = json.loads(result_path.read_text(encoding="utf-8"))
           passed = bool(r.get("suite_passed"))
-          blocked = bool(r.get("budget_blocked"))
+          blocked = bool(r.get("platform_blocked", r.get("budget_blocked")))
           overall = r.get("overall_score")
-          overall_text = "N/A (platform budget blocked)" if overall is None else f"{float(overall):.3f}"
+          overall_text = "N/A (platform blocked)" if overall is None else f"{float(overall):.3f}"
           lines = [
               "# ORBYTHRA Strategic AI Validation",
               "",
@@ -95,12 +95,13 @@ jobs:
               f"- Overall score: **{overall_text}**",
               f"- Minimum required score: **{float(r.get('minimum_overall_score', 0)):.2f}**",
               f"- Median executed-request latency: **{r.get('median_latency_ms')} ms**",
-              f"- Platform budget blocked: **{str(blocked).upper()}**",
+              f"- Platform blocked: **{str(blocked).upper()}**",
+              f"- Block reasons: **{', '.join(r.get('block_reasons') or []) or 'none'}**",
               f"- Suite passed: **{str(passed).upper()}**",
               "",
               "## Claim boundary",
               "",
-              "This is a single-session capability benchmark. Concurrent-load and SLO evidence are measured separately by the production evidence/resilience workflows. A platform token-budget block is not converted into a zero model-quality score, and it still prevents a pass claim.",
+              "This is a single-session capability benchmark. Concurrent-load and SLO evidence are measured separately by the production evidence/resilience workflows. A recognized platform availability block is not converted into a zero model-quality score, and it still prevents a pass claim.",
               str(r.get("claim_boundary") or "First-party production benchmark only."),
               "",
               "## Cases",
