@@ -17,6 +17,10 @@ def _report() -> dict:
                 "kind": "observation",
                 "confidence": 0.8,
                 "evidence_ids": ["ev1"],
+            "url": "https://example.org/source",
+            "digest": "sha256:ev1",
+            "support": 0.95,
+            "authority": 0.90,
             }
         ],
         "historical_timeline": [
@@ -52,6 +56,10 @@ def _evidence() -> list[dict]:
             "domain": "example.net",
             "providers": ["provider-b"],
             "evidence_ids": ["ev2"],
+            "url": "https://example.net/source",
+            "digest": "sha256:ev2",
+            "support": 0.90,
+            "authority": 0.85,
         },
     ]
 
