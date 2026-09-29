@@ -12,6 +12,7 @@ from typing import Any
 
 from autonomy import AutonomyStore
 from config import get_settings
+from hallucination_guard import evaluate_claims
 
 _WORD_RE = re.compile(r"[\wçğıöşüÇĞİÖŞÜ-]+", re.UNICODE)
 
@@ -375,8 +376,27 @@ def evaluate_report(
     evidence_items: list[dict[str, Any]],
 ) -> dict[str, Any]:
     claims = [row for row in report.get("claims", []) if isinstance(row, dict)]
-    cited_claims = [row for row in claims if row.get("evidence_ids")]
-    evidence_coverage = len(cited_claims) / max(1, len(claims)) if claims else (1.0 if evidence_items else 0.35)
+    guard_evidence = []
+    for item in evidence_items:
+        if not isinstance(item, dict):
+            continue
+        evidence_id = item.get("id") or item.get("item_id") or item.get("evidence_id")
+        if not evidence_id:
+            continue
+        guard_evidence.append(
+            {
+                **item,
+                "id": str(evidence_id),
+                "support": float(item.get("support", item.get("score", 0.0))),
+                "authority": float(item.get("authority", item.get("score", 0.0))),
+            }
+        )
+    guard_result = evaluate_claims(claims, guard_evidence) if claims else None
+    evidence_coverage = (
+        float(guard_result["evidence_gate_pass_rate"])
+        if guard_result
+        else (1.0 if evidence_items else 0.35)
+    )
 
     domains = {str(row.get("domain") or "") for row in evidence_items if row.get("domain")}
     providers = {
@@ -419,6 +439,10 @@ def evaluate_report(
         "spatial_quality": round(spatial_quality, 4),
         "idea_quality": round(idea_quality, 4),
         "confidence_calibration": round(calibration, 4),
+        "hallucination_guard_pass_rate": round(evidence_coverage, 4),
+        "hallucination_overconfidence_rate": (
+            float(guard_result["overconfidence_rate"]) if guard_result else 0.0
+        ),
     }
     weights = {
         "evidence_coverage": 0.26,
