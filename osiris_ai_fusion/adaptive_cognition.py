@@ -380,17 +380,20 @@ def evaluate_report(
     for item in evidence_items:
         if not isinstance(item, dict):
             continue
-        evidence_id = item.get("id") or item.get("item_id") or item.get("evidence_id")
-        if not evidence_id:
-            continue
-        guard_evidence.append(
-            {
-                **item,
-                "id": str(evidence_id),
-                "support": float(item.get("support", item.get("score", 0.0))),
-                "authority": float(item.get("authority", item.get("score", 0.0))),
-            }
-        )
+        evidence_ids = item.get("evidence_ids") or [
+            item.get("id") or item.get("item_id") or item.get("evidence_id")
+        ]
+        for evidence_id in evidence_ids:
+            if not evidence_id:
+                continue
+            guard_evidence.append(
+                {
+                    **item,
+                    "id": str(evidence_id),
+                    "support": float(item.get("support", item.get("score", 0.0))),
+                    "authority": float(item.get("authority", item.get("score", 0.0))),
+                }
+            )
     guard_result = evaluate_claims(claims, guard_evidence) if claims else None
     evidence_coverage = (
         float(guard_result["evidence_gate_pass_rate"])
