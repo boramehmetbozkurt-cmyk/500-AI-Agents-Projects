@@ -1,7 +1,15 @@
-from datetime import datetime, timezone
-from hallucination_guard import CONTRADICTED, INSUFFICIENT_EVIDENCE, LOW_AUTHORITY, STALE_EVIDENCE, SUPPORTED, evaluate_claims, verify_claim
+from datetime import UTC, datetime
+from hallucination_guard import (
+    CONTRADICTED,
+    INSUFFICIENT_EVIDENCE,
+    LOW_AUTHORITY,
+    STALE_EVIDENCE,
+    SUPPORTED,
+    evaluate_claims,
+    verify_claim,
+)
 
-NOW = datetime(2026, 9, 29, tzinfo=timezone.utc)
+NOW = datetime(2026, 9, 29, tzinfo=UTC)
 GOOD = {"id": "e1", "support": 0.95, "authority": 0.95, "retrieved_at": "2026-09-29T10:00:00Z"}
 
 def test_fake_id_rejected():
