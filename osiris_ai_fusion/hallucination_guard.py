@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 SUPPORTED = "SUPPORTED"
@@ -25,13 +25,13 @@ def _fresh(item: dict[str, Any], now: datetime, max_age_days: int) -> bool:
     try:
         stamp = datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
         if stamp.tzinfo is None:
-            stamp = stamp.replace(tzinfo=timezone.utc)
-        return (now - stamp.astimezone(timezone.utc)).days <= max_age_days
+            stamp = stamp.replace(tzinfo=UTC)
+        return (now - stamp.astimezone(UTC)).days <= max_age_days
     except (TypeError, ValueError):
         return False
 
 def verify_claim(claim: dict[str, Any], evidence: list[dict[str, Any]], *, minimum_support: float = 0.75, minimum_authority: float = 0.60, max_age_days: int = 30, now: datetime | None = None) -> ClaimVerdict:
-    now = now or datetime.now(timezone.utc)
+    now = now or datetime.now(UTC)
     store = {str(item.get("id")): item for item in evidence if item.get("id")}
     bound = [store[str(x)] for x in claim.get("evidence_ids") or [] if str(x) in store]
     ids = tuple(str(x["id"]) for x in bound)
