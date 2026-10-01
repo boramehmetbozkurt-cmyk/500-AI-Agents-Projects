@@ -1,43 +1,19 @@
 services:
   - type: web
-    name: orbythra
-    runtime: docker
-    branch: main
-    rootDir: osiris_ai_fusion
-    dockerfilePath: ./Dockerfile
-    dockerContext: .
-    healthCheckPath: /health
-    autoDeploy: true
-    envVars:
-      - key: APP_ENV
-        value: production
-      - key: UI_ENABLED
-        value: "true"
-      - key: AI_PLANNER_ENABLED
-        value: "true"
-      - key: COMMERCIAL_MODE
-        value: "false"
-      - key: STRICT_COMMERCIAL_SOURCES
-        value: "true"
-      - key: WATCHER_ENABLED
-        value: "false"
-      - key: FUSION_STORE_PATH
-        value: /var/lib/orbythra/fusion.sqlite3
-      - key: SEAL_REPLAY_DB
-        value: /var/lib/orbythra/seal-replay.sqlite3
-      - key: ORBYTHRA_FUSION_API_KEY
-        generateValue: true
-      - key: SEAL_ED25519_PRIVATE_KEY_B64
-        sync: false
-      - key: REQUIRE_SIGNED_RECEIPTS
-        value: "false"
-      - key: LLM_FALLBACK_BASE_URL
-        sync: false
-      - key: LLM_FALLBACK_API_KEY
-        sync: false
-      - key: LLM_FALLBACK_MODEL
-        sync: false
-    disk:
-      name: orbythra-data
-      mountPath: /var/lib/orbythra
-      sizeGB: 1
+    name: orbythra-demo
+    runtime: static
+    branch: orbythra-one-click-deploy-v2
+    rootDir: orbythra_live_demo
+    buildCommand: echo "ORBYTHRA demo requires no build step"
+    staticPublishPath: .
+    autoDeployTrigger: off
+    headers:
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: Referrer-Policy
+        value: no-referrer
+      - path: /*
+        name: X-Frame-Options
+        value: DENY
