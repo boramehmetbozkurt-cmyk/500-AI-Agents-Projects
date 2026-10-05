@@ -1,0 +1,72 @@
+name: ORBYTHRA V17 Hierarchical Generalist Gate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  v17-generalist:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      PYTHONPATH: .
+      ORBYTHRA_ENV: test
+      ORBYTHRA_API_KEYS: ci:ci-test-key
+      ORBYTHRA_API_ROLES: ci=admin
+      ORBYTHRA_DB_PATH: /tmp/orbythra-v17-ci.db
+      ORBYTHRA_RATE_LIMIT_PER_MINUTE: 1000
+      ORBYTHRA_MASTER_KEYS: ci-v17:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+      ORBYTHRA_RELEASE_SHA: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install dependencies
+        run: python -m pip install -r requirements-dev.txt -c requirements.lock
+      - name: Compile V17 modules
+        run: python -m py_compile app/hierarchical_generalist_v17.py app/api.py
+      - name: V17 hierarchical generalist regression suite
+        run: pytest -q tests/test_hierarchical_generalist_v17.py
+      - name: V17 production OpenAPI composition gate
+        run: |
+          python - <<'PYTHON'
+          from app.api import app
+          paths=set(app.openapi()["paths"])
+          required={
+              "/v17/generalist/programs",
+              "/v17/generalist/programs/{program_id}",
+              "/v17/generalist/programs/{program_id}/resume",
+              "/v17/generalist/goals/{goal_id}/expand",
+              "/v17/generalist/goals/{goal_id}/checkpoint",
+              "/v17/generalist/goals/{goal_id}/evaluate",
+              "/v17/generalist/goals/{goal_id}/replan",
+              "/v17/generalist/skills/synthesize",
+              "/v17/generalist/skills/{candidate_id}/trials",
+              "/v17/generalist/skills/{candidate_id}/decision",
+              "/v17/generalist/skills/{candidate_id}/promote",
+              "/v17/generalist/causal/models",
+              "/v17/generalist/causal/models/{model_id}/counterfactual-impact",
+              "/v17/generalist/readiness",
+          }
+          missing=sorted(required-paths)
+          assert not missing, missing
+          print("V17 OpenAPI composition passed")
+          PYTHON
+      - name: V17 claim-boundary gate
+        run: |
+          python - <<'PYTHON'
+          from pathlib import Path
+          text=Path("app/hierarchical_generalist_v17.py").read_text(encoding="utf-8")
+          assert '"unrestricted_self_modification": False' in text
+          assert '"model_weight_learning": False' in text
+          assert '"live_agi_claim": False' in text
+          assert "does not prove AGI" in text
+          print("V17 AGI claim boundary passed")
+          PYTHON

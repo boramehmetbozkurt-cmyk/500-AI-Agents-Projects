@@ -1,0 +1,94 @@
+name: ORBYTHRA V20 Learning and Multimodal Gate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  v20:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: .
+      ORBYTHRA_ENV: test
+      ORBYTHRA_API_KEYS: ci:ci-test-key
+      ORBYTHRA_API_ROLES: ci=admin
+      ORBYTHRA_DB_PATH: /tmp/orbythra-v20-ci.db
+      ORBYTHRA_RATE_LIMIT_PER_MINUTE: 1000
+      ORBYTHRA_MASTER_KEYS: ci-v20:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+      ORBYTHRA_RELEASE_SHA: \${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install dependencies
+        run: python -m pip install -r requirements-dev.txt -c requirements.lock
+      - name: Compile V20 modules
+        run: python -m py_compile app/learning_engine_v20.py app/skill_invention_v20.py app/multimodal_world_v20.py app/api.py
+      - name: V20 learning skill and multimodal regression suite
+        run: pytest -q tests/test_v20_learning_skill_multimodal.py
+      - name: V20 production OpenAPI composition gate
+        run: |
+          python - <<'PYTHON'
+          from app.api import app
+          paths=set(app.openapi()["paths"])
+          required={
+              "/v20/learning/jobs",
+              "/v20/learning/jobs/{job_id}",
+              "/v20/learning/jobs/{job_id}/submit",
+              "/v20/learning/jobs/{job_id}/refresh",
+              "/v20/learning/jobs/{job_id}/register-candidate",
+              "/v20/learning/readiness",
+              "/v20/skills/invent",
+              "/v20/skills/inventions/{invention_id}",
+              "/v20/skills/inventions/{invention_id}/evaluate-manual",
+              "/v20/skills/inventions/{invention_id}/evaluate-sandbox",
+              "/v20/skills/readiness",
+              "/v20/multimodal/fuse",
+              "/v20/multimodal/readiness",
+          }
+          missing=sorted(required-paths)
+          assert not missing, missing
+          print("V20 OpenAPI composition passed")
+          PYTHON
+      - name: V20 production integration config gate
+        run: |
+          python - <<'PYTHON'
+          from pathlib import Path
+          compose=Path("docker-compose.production.yml").read_text(encoding="utf-8")
+          env=Path(".env.example").read_text(encoding="utf-8")
+          for key in (
+              "ORBYTHRA_TRAINING_PROVIDER_URL",
+              "ORBYTHRA_TRAINING_PROVIDER_TOKEN",
+              "ORBYTHRA_SKILL_SANDBOX_URL",
+              "ORBYTHRA_SKILL_SANDBOX_TOKEN",
+              "ORBYTHRA_MULTIMODAL_ALLOWED_ADAPTERS",
+          ):
+              assert key in compose
+              assert key in env
+          print("V20 production integration config passed")
+          PYTHON
+      - name: V20 authority and AGI claim-boundary gate
+        run: |
+          python - <<'PYTHON'
+          from pathlib import Path
+          learning=Path("app/learning_engine_v20.py").read_text(encoding="utf-8")
+          skill=Path("app/skill_invention_v20.py").read_text(encoding="utf-8")
+          multi=Path("app/multimodal_world_v20.py").read_text(encoding="utf-8")
+          assert '"foundation_model_training_embedded_in_api_process": False' in learning
+          assert '"unrestricted_self_modification": False' in learning
+          assert '"arbitrary_code_execution_inside_api": False' in skill
+          assert '"automatic_permission_escalation": False' in skill
+          assert '"native_media_decoding_inside_core": False' in multi
+          assert '"live_agi_claim": False' in learning
+          assert '"live_agi_claim": False' in skill
+          assert '"live_agi_claim": False' in multi
+          print("V20 claim boundary passed")
+          PYTHON

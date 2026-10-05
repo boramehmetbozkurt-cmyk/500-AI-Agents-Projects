@@ -1,0 +1,103 @@
+{
+  "name": "ORBYTHRA Autonomy Planning Challenge v1",
+  "version": "1.0.0",
+  "minimum_exact_match_rate": 1.0,
+  "claim_boundary": "Internal deterministic planning regression evidence only. This corpus does not establish AGI, general intelligence, autonomous real-world safety, or independent validation.",
+  "scenarios": [
+    {
+      "id": "single-capability",
+      "required_capabilities": ["research"],
+      "viable_skills": [
+        {"skill_id": "s1", "capabilities": ["research"], "risk_tier": "moderate"}
+      ],
+      "expected_selected": ["s1"],
+      "expected_missing": []
+    },
+    {
+      "id": "missing-capability",
+      "required_capabilities": ["analysis"],
+      "viable_skills": [
+        {"skill_id": "s1", "capabilities": ["research"], "risk_tier": "low"}
+      ],
+      "expected_selected": [],
+      "expected_missing": ["analysis"]
+    },
+    {
+      "id": "prefer-lower-risk",
+      "required_capabilities": ["research"],
+      "viable_skills": [
+        {"skill_id": "high", "capabilities": ["research"], "risk_tier": "high"},
+        {"skill_id": "low", "capabilities": ["research"], "risk_tier": "low"}
+      ],
+      "expected_selected": ["low"],
+      "expected_missing": []
+    },
+    {
+      "id": "stable-id-tiebreak",
+      "required_capabilities": ["research"],
+      "viable_skills": [
+        {"skill_id": "z-skill", "capabilities": ["research"], "risk_tier": "moderate"},
+        {"skill_id": "a-skill", "capabilities": ["research"], "risk_tier": "moderate"}
+      ],
+      "expected_selected": ["a-skill"],
+      "expected_missing": []
+    },
+    {
+      "id": "multi-capability-two-skills",
+      "required_capabilities": ["research", "verification"],
+      "viable_skills": [
+        {"skill_id": "researcher", "capabilities": ["research"], "risk_tier": "low"},
+        {"skill_id": "verifier", "capabilities": ["verification"], "risk_tier": "moderate"}
+      ],
+      "expected_selected": ["researcher", "verifier"],
+      "expected_missing": []
+    },
+    {
+      "id": "one-skill-covers-two",
+      "required_capabilities": ["research", "verification"],
+      "viable_skills": [
+        {"skill_id": "combo", "capabilities": ["research", "verification"], "risk_tier": "moderate"}
+      ],
+      "expected_selected": ["combo"],
+      "expected_missing": []
+    },
+    {
+      "id": "deduplicate-required",
+      "required_capabilities": ["research", "research"],
+      "viable_skills": [
+        {"skill_id": "s1", "capabilities": ["research"], "risk_tier": "low"}
+      ],
+      "expected_selected": ["s1"],
+      "expected_missing": []
+    },
+    {
+      "id": "partial-coverage",
+      "required_capabilities": ["research", "execution", "verification"],
+      "viable_skills": [
+        {"skill_id": "researcher", "capabilities": ["research"], "risk_tier": "moderate"},
+        {"skill_id": "verifier", "capabilities": ["verification"], "risk_tier": "moderate"}
+      ],
+      "expected_selected": ["researcher", "verifier"],
+      "expected_missing": ["execution"]
+    },
+    {
+      "id": "empty-requirements",
+      "required_capabilities": [],
+      "viable_skills": [
+        {"skill_id": "unused", "capabilities": ["research"], "risk_tier": "low"}
+      ],
+      "expected_selected": [],
+      "expected_missing": []
+    },
+    {
+      "id": "deterministic-across-input-order",
+      "required_capabilities": ["analysis"],
+      "viable_skills": [
+        {"skill_id": "b", "capabilities": ["analysis"], "risk_tier": "low"},
+        {"skill_id": "a", "capabilities": ["analysis"], "risk_tier": "low"}
+      ],
+      "expected_selected": ["a"],
+      "expected_missing": []
+    }
+  ]
+}

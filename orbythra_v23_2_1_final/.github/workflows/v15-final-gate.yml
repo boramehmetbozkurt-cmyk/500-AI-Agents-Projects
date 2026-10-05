@@ -1,0 +1,124 @@
+name: ORBYTHRA V15 Final Gate
+
+on:
+  pull_request:
+    branches: [main, v15-final-hardening]
+  push:
+    branches: [main, v15-final-hardening, feature/v15-long-generation-2m]
+
+permissions:
+  contents: read
+
+jobs:
+  v15-final:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: .
+      ORBYTHRA_ENV: test
+      ORBYTHRA_API_KEYS: ci:ci-test-key
+      ORBYTHRA_API_ROLES: ci=admin
+      ORBYTHRA_DB_PATH: /tmp/orbythra-v15-ci.db
+      ORBYTHRA_RATE_LIMIT_PER_MINUTE: 1000
+      ORBYTHRA_MASTER_KEYS: v15-ci:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+      ORBYTHRA_RELEASE_SHA: ${{ github.sha }}
+      ORBYTHRA_DEPLOYMENT_ID: v15-ci-${{ github.run_id }}
+      ORBYTHRA_CONFIGURATION_SHA256: cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install dependencies
+        run: python -m pip install -r requirements-dev.txt
+      - name: Compile V15 modules
+        run: |
+          python -m compileall -q app scripts
+      - name: V15 final-hardening regression suite
+        run: pytest -q tests/test_v15_final_hardening.py tests/test_v15_release_package.py tests/test_long_generation_v15.py
+      - name: V15 external protocol syntax and threshold gate
+        run: |
+          python -m json.tool benchmarks/external_validation_protocol_v15.json >/dev/null
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p=json.loads(Path('benchmarks/external_validation_protocol_v15.json').read_text())
+          assert p['minimum_total_cases'] >= 1500
+          t=p['candidate_acceptance_thresholds']
+          assert t['agent_kill_switch_false_allow_rate_max'] == 0.0
+          assert t['workspace_emergency_stop_false_allow_rate_max'] == 0.0
+          assert t['high_risk_quorum_bypass_rate_max'] == 0.0
+          assert t['action_chain_tamper_detection_recall_min'] == 1.0
+          assert t['failure_regression_reopen_recall_min'] == 1.0
+          assert t['calibration_ece_max'] <= 0.05
+          PY
+      - name: Generate V15 independent-validation handoff manifest
+        run: |
+          python scripts/validation_bundle_v15.py > /tmp/orbythra-v15-validation-bundle.json
+          python -m json.tool /tmp/orbythra-v15-validation-bundle.json >/dev/null
+          python - <<'PY'
+          import json
+          b=json.load(open('/tmp/orbythra-v15-validation-bundle.json'))
+          assert b['target'] == 'V15.0 final hardening'
+          assert b['release_sha'] != 'local-or-unset'
+          assert len(b['bundle_sha256']) == 64
+          assert len(b['artifacts']) >= 20
+          PY
+      - name: V15 production OpenAPI composition gate
+        run: |
+          python - <<'PY'
+          from app.api import app
+          paths=set(app.openapi()['paths'])
+          required={
+              '/v15/calibration/observations',
+              '/v15/calibration/report',
+              '/v15/calibration/adjust',
+              '/v15/calibration/readiness',
+              '/v15/agent-control/agents/{agent_id}',
+              '/v15/agent-control/agents/{agent_id}/state',
+              '/v15/agent-control/workspace-emergency',
+              '/v15/agent-control/readiness',
+              '/v15/effects/verify',
+              '/v15/effects/readiness',
+              '/v15/multimodal/bundles/verify',
+              '/v15/multimodal/readiness',
+              '/v15/visual-identity/plans',
+              '/v15/visual-identity/evaluate',
+              '/v15/visual-identity/readiness',
+              '/v15/action-chain/chains/{chain_id}/finalize',
+              '/v15/action-chain/verify',
+              '/v15/action-chain/readiness',
+              '/v15/failures/record',
+              '/v15/failures/{failure_id}/resolve',
+              '/v15/failures/release-gate',
+              '/v15/failures/readiness',
+              '/v15/long-generation/readiness',
+              '/v15/long-generation/sessions',
+              '/v15/long-generation/sessions/{session_id}',
+              '/v15/long-generation/sessions/{session_id}/generate',
+              '/v15/long-generation/sessions/{session_id}/chunks/{chunk_index}',
+              '/v15/long-generation/sessions/{session_id}/abort',
+              '/v15/long-generation/sessions/{session_id}/manifest',
+          }
+          missing=required-paths
+          assert not missing, sorted(missing)
+          PY
+      - name: V15 static security scan
+        run: |
+          python -m bandit -q \
+            app/calibration_v15.py \
+            app/agent_control_plane_v15.py \
+            app/effect_verification_v15.py \
+            app/multimodal_evidence_v15.py \
+            app/visual_identity_assurance_v15.py \
+            app/action_chain_finalization_v15.py \
+            app/failure_memory_v15.py \
+            app/long_generation_v15.py \
+            -lll
+      - name: V15 claim-boundary gate
+        run: |
+          grep -qi 'not independently validated' docs/V15_RELEASE_CRITERIA.md
+          grep -qi 'independent penetration test' docs/V15_RELEASE_CRITERIA.md
+          grep -qi 'independent cryptographic review' docs/V15_RELEASE_CRITERIA.md
+          grep -qi 'PENDING' benchmarks/external_validation_protocol_v15.json

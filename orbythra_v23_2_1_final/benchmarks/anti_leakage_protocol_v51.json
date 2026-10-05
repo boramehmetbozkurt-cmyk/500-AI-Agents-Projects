@@ -1,0 +1,15 @@
+{
+  "schema": "orbythra.anti-leakage.v5.1",
+  "rules": [
+    "challenge cases generated or selected outside ORBYTHRA custody",
+    "case_set_sha256 committed before execution",
+    "validator nonce kept outside system until submission",
+    "exact release SHA pinned",
+    "validator signs exact evaluation payload with registered Ed25519 key",
+    "challenge IDs unique and case IDs unique",
+    "no benchmark answers embedded in repository",
+    "raw hidden cases remain validator-controlled",
+    "result report includes release SHA, case-set digest, validator key fingerprint and statistical metrics"
+  ],
+  "boundary": "Protocol controls reduce benchmark leakage risk but do not prove independent custody unless an external validator follows and attests to them."
+}

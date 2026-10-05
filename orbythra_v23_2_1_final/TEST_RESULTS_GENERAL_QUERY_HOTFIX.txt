@@ -1,0 +1,18 @@
+ORBYTHRA V23.2 General Query Hotfix
+Date: 2026-10-05
+
+Backend full regression:
+889 passed, 3 skipped, 0 failed
+Command: ORBYTHRA_RELEASE_SHA=1111111111111111111111111111111111111111 PYTHONPATH=. pytest -q
+
+Targeted query/evidence regression:
+20 passed, 1 skipped, 0 failed
+Covers:
+- BTC nedir? -> answer remains visible in AUTO when only evidence gates fail
+- What is Bitcoin? -> same behavior
+- AUTO person/profile lookup -> remains fail-closed without direct evidence
+- Google/LinkedIn discovery snippet -> never promoted to evidence or answer context
+
+Frontend build:
+Not completed in this sandbox because npm dependency installation timed out and Vite was unavailable locally.
+The JSX change is limited to REVIEW/BLOCKED presentation text and an inline review notice.

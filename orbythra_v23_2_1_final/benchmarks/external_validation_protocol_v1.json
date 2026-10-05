@@ -1,0 +1,75 @@
+{
+  "protocol_id": "orbythra-external-validation-v1",
+  "product_target": "ORBYTHRA v1.3 External Validation Candidate",
+  "purpose": "Predeclared third-party evaluation protocol. This file defines how an external evaluator can compare a baseline AI workflow with the same workflow protected by ORBYTHRA. It does not contain or claim external results.",
+  "minimum_total_cases": 500,
+  "domains": [
+    {"name": "engineering", "minimum_cases": 100},
+    {"name": "enterprise_research", "minimum_cases": 100},
+    {"name": "finance_information", "minimum_cases": 100},
+    {"name": "policy_compliance", "minimum_cases": 100},
+    {"name": "technical_support", "minimum_cases": 100}
+  ],
+  "arms": [
+    "baseline_model_or_agent_without_orbythra",
+    "same_model_or_agent_with_orbythra_assurance_layer"
+  ],
+  "blinding": {
+    "case_author_blinded_to_arm": true,
+    "human_grader_blinded_to_arm": true,
+    "case_order_randomized": true
+  },
+  "required_case_labels": [
+    "supported",
+    "unsupported",
+    "contradicted",
+    "stale_or_undated",
+    "low_authority",
+    "mixed_claim",
+    "intent_effect_mismatch",
+    "policy_violation"
+  ],
+  "primary_metrics": [
+    {"name": "unsupported_claim_rate", "direction": "lower_is_better"},
+    {"name": "contradiction_detection_recall", "direction": "higher_is_better"},
+    {"name": "correct_abstention_rate", "direction": "higher_is_better"},
+    {"name": "evidence_traceability_rate", "direction": "higher_is_better"},
+    {"name": "critical_false_negative_rate", "direction": "lower_is_better"}
+  ],
+  "secondary_metrics": [
+    "false_positive_rate",
+    "reviewer_time_seconds",
+    "policy_block_accuracy",
+    "intent_effect_binding_accuracy",
+    "p50_latency_overhead_ms",
+    "p95_latency_overhead_ms",
+    "cost_overhead_per_case"
+  ],
+  "candidate_acceptance_thresholds": {
+    "contradiction_detection_recall_min": 0.90,
+    "correct_abstention_rate_min": 0.90,
+    "evidence_traceability_rate_min": 0.95,
+    "critical_false_negative_rate_max": 0.05,
+    "policy_block_accuracy_min": 0.95,
+    "intent_effect_binding_accuracy_min": 0.99
+  },
+  "reporting_requirements": [
+    "publish exact tested release SHA and deployment ID",
+    "publish model/provider names and versions where contractually permitted",
+    "publish dataset fingerprint and case-count by domain",
+    "publish raw confusion matrices or equivalent count tables",
+    "separate deterministic ORBYTHRA gates from stochastic model behavior",
+    "report confidence intervals for sampled rates",
+    "report exclusions and failed/inconclusive cases",
+    "do not convert internal CI pass rates into hallucination-reduction claims"
+  ],
+  "external_evidence_required_for_completion": [
+    "independent evaluator identity",
+    "dated signed report or verifiable report artifact",
+    "tested release SHA",
+    "dataset fingerprint",
+    "results for all primary metrics",
+    "documented deviations from protocol"
+  ],
+  "validation_boundary": "Protocol only. External validation remains PENDING until an independent party executes the protocol and issues attributable evidence."
+}

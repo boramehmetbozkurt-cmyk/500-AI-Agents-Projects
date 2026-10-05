@@ -1,0 +1,44 @@
+name: ORBYTHRA V22 Crypto Hardening Gate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  v22-crypto:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      PYTHONPATH: .
+      ORBYTHRA_ENV: test
+      ORBYTHRA_API_KEYS: tester:test-secret,other:other-secret
+      ORBYTHRA_API_ROLES: tester=admin,other=viewer
+      ORBYTHRA_DB_PATH: /tmp/orbythra-v22-gate.db
+      ORBYTHRA_MASTER_KEYS: v22-enc:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+      ORBYTHRA_SIGNING_KEYS: v22-sign:BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
+      ORBYTHRA_PQC_MODE: off
+      ORBYTHRA_RELEASE_SHA: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install dependencies
+        run: python -m pip install -r requirements-dev.txt -c requirements.lock
+      - name: Compile crypto paths
+        run: python -m compileall -q app/crypto_core.py app/crypto_recipient.py app/crypto_models.py app/config.py app/main.py
+      - name: Run V22 and crypto regression tests
+        run: pytest -q tests/test_v22_crypto_hardening.py tests/test_signed_approvals.py tests/test_crypto_trust_layer.py tests/test_v13_crypto_validation.py
+      - name: Validate production compose key separation inputs
+        env:
+          POSTGRES_PASSWORD: v22-ci-postgres
+          ORBYTHRA_API_KEYS: v22:v22-ci-key
+          ORBYTHRA_MASTER_KEYS: v22-enc:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+          ORBYTHRA_SIGNING_KEYS: v22-sign:BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
+        run: docker compose -f docker-compose.production.yml config -q

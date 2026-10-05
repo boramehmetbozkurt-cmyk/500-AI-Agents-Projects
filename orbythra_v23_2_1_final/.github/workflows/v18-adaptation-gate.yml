@@ -1,0 +1,66 @@
+name: ORBYTHRA V18 Governed Adaptation Gate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  v18-adaptation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      PYTHONPATH: .
+      ORBYTHRA_ENV: test
+      ORBYTHRA_API_KEYS: ci:ci-test-key
+      ORBYTHRA_API_ROLES: ci=admin
+      ORBYTHRA_DB_PATH: /tmp/orbythra-v18-ci.db
+      ORBYTHRA_RATE_LIMIT_PER_MINUTE: 1000
+      ORBYTHRA_MASTER_KEYS: ci-v18:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+      ORBYTHRA_RELEASE_SHA: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install dependencies
+        run: python -m pip install -r requirements-dev.txt -c requirements.lock
+      - name: Compile V18 modules
+        run: python -m py_compile app/governed_model_adaptation_v18.py app/api.py
+      - name: V18 governed adaptation regression suite
+        run: pytest -q tests/test_governed_model_adaptation_v18.py
+      - name: V18 production OpenAPI composition gate
+        run: |
+          python - <<'PYTHON'
+          from app.api import app
+          paths=set(app.openapi()["paths"])
+          required={
+              "/v18/adaptation/plans",
+              "/v18/adaptation/plans/{plan_id}/candidate",
+              "/v18/adaptation/candidates/{candidate_id}/benchmark",
+              "/v18/adaptation/candidates/{candidate_id}/canary/start",
+              "/v18/adaptation/candidates/{candidate_id}/canary/advance",
+              "/v18/adaptation/candidates/{candidate_id}/rollback",
+              "/v18/adaptation/routes/{route_id}/resolve",
+              "/v18/adaptation/readiness",
+          }
+          missing=sorted(required-paths)
+          assert not missing, missing
+          print("V18 OpenAPI composition passed")
+          PYTHON
+      - name: V18 claim-boundary gate
+        run: |
+          python - <<'PYTHON'
+          from pathlib import Path
+          text=Path("app/governed_model_adaptation_v18.py").read_text(encoding="utf-8")
+          assert '"foundation_model_weight_training_inside_orbythra": False' in text
+          assert '"unrestricted_self_modification": False' in text
+          assert '"live_agi_claim": False' in text
+          assert "does not itself train foundation-model weights" in text
+          print("V18 claim boundary passed")
+          PYTHON

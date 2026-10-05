@@ -1,0 +1,74 @@
+name: ORBYTHRA V21 Assurance Observability Gate
+
+on:
+  push:
+    branches:
+      - main
+      - v21-assurance-observability
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  v21-assurance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      PYTHONPATH: .
+      ORBYTHRA_ENV: test
+      ORBYTHRA_API_KEYS: tester:test-secret
+      ORBYTHRA_API_ROLES: tester=admin
+      ORBYTHRA_DB_PATH: /tmp/orbythra-v21-ci.db
+      ORBYTHRA_RATE_LIMIT_PER_MINUTE: 1000
+      ORBYTHRA_MASTER_KEYS: v21-ci:MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install dependencies
+        run: python -m pip install -r requirements-dev.txt -c requirements.lock
+      - name: Compile V21 production composition
+        run: python -m compileall -q app scripts tests/test_v21_assurance_observability.py
+      - name: V21 focused regression tests
+        run: pytest -q tests/test_v21_assurance_observability.py tests/test_ledger_observability_hardening.py
+      - name: V21 OpenAPI contract gate
+        run: |
+          python - <<'PYTHON'
+          from app.api import app
+          paths = app.openapi()["paths"]
+          required = {
+              "/v21/assurance/datasets",
+              "/v21/assurance/datasets/{dataset_id}/versions",
+              "/v21/assurance/datasets/versions/{version_id}",
+              "/v21/assurance/prompts",
+              "/v21/assurance/prompts/{version_id}",
+              "/v21/assurance/experiments",
+              "/v21/assurance/experiments/{experiment_id}/results",
+              "/v21/assurance/experiments/{experiment_id}",
+              "/v21/assurance/experiments/compare",
+              "/v21/assurance/traces/spans",
+              "/v21/assurance/traces/{trace_id}/lineage",
+              "/v21/assurance/readiness",
+          }
+          missing = sorted(required - paths.keys())
+          assert not missing, missing
+          print("V21 OpenAPI contract passed")
+          PYTHON
+      - name: V21 claim-boundary gate
+        run: |
+          python - <<'PYTHON'
+          from pathlib import Path
+          source = Path("app/assurance_lab_v21.py").read_text()
+          assert '"live_agi_claim": False' in source
+          assert '"automatic_permission_escalation": False' in source
+          assert '"unrestricted_model_execution_inside_assurance_lab": False' in source
+          assert "External product/security validation remains a separate gate" in source
+          print("V21 claim boundary passed")
+          PYTHON
+      - name: Security scan V21 modules
+        run: python -m bandit -q app/assurance_lab_v21.py app/telemetry.py -lll

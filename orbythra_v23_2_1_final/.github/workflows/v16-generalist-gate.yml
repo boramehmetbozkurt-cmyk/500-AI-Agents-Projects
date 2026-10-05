@@ -1,0 +1,65 @@
+name: ORBYTHRA V16 Continual Generalist Gate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  v16-generalist:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      PYTHONPATH: .
+      ORBYTHRA_ENV: test
+      ORBYTHRA_API_KEYS: ci:ci-test-key
+      ORBYTHRA_API_ROLES: ci=admin
+      ORBYTHRA_DB_PATH: /tmp/orbythra-v16-ci.db
+      ORBYTHRA_RATE_LIMIT_PER_MINUTE: 1000
+      ORBYTHRA_MASTER_KEYS: ci-v16:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+      ORBYTHRA_RELEASE_SHA: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install dependencies
+        run: python -m pip install -r requirements-dev.txt -c requirements.lock
+      - name: Compile V16 modules
+        run: python -m py_compile app/continual_generalist_v16.py app/api.py
+      - name: V16 continual learning regression suite
+        run: pytest -q tests/test_continual_generalist_v16.py
+      - name: V16 production OpenAPI composition gate
+        run: |
+          python - <<'PYTHON'
+          from app.api import app
+          paths=set(app.openapi()["paths"])
+          required={
+              "/v16/continual/skills/experiences",
+              "/v16/continual/skills/{skill_id}/promotion",
+              "/v16/continual/skills/{skill_id}/curriculum",
+              "/v16/continual/skills/{skill_id}/promote",
+              "/v16/continual/world/facts",
+              "/v16/continual/world/consolidate-memory",
+              "/v16/continual/world/query",
+              "/v16/continual/readiness",
+          }
+          missing=sorted(required-paths)
+          assert not missing, missing
+          print("V16 OpenAPI composition passed")
+          PYTHON
+      - name: V16 claim-boundary gate
+        run: |
+          python - <<'PYTHON'
+          from pathlib import Path
+          text=Path("app/continual_generalist_v16.py").read_text(encoding="utf-8")
+          assert '"live_agi_claim": False' in text
+          assert '"model_weight_learning": False' in text
+          assert "not proof of AGI" in text
+          print("V16 AGI claim boundary passed")
+          PYTHON

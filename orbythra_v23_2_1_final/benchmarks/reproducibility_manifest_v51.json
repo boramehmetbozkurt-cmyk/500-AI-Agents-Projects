@@ -1,0 +1,30 @@
+{
+  "schema": "orbythra.reproducibility.v5.1",
+  "version": "5.1.0",
+  "required_inputs": [
+    "exact_git_commit_sha",
+    "dependency_lock_or_requirements",
+    "ORBYTHRA_RELEASE_SHA",
+    "challenge_case_set_sha256",
+    "validator_id",
+    "validator_ed25519_key_fingerprint",
+    "signed_evaluation_payload"
+  ],
+  "required_outputs": [
+    "pytest_result",
+    "million_case_crypto_gate",
+    "v5_generalist_gate",
+    "v5.1_hardening_gate",
+    "security_scans",
+    "release_evidence_manifest"
+  ],
+  "instructions": [
+    "checkout exact commit",
+    "install requirements-dev.txt in Python 3.12 environment",
+    "set test-only keys and exact ORBYTHRA_RELEASE_SHA",
+    "run pytest",
+    "run CI gates in .github/workflows/ci.yml order",
+    "retain JSON outputs and SHA-256 digests"
+  ],
+  "boundary": "Reproducibility metadata enables repetition; an external party must execute it independently for independent evidence."
+}

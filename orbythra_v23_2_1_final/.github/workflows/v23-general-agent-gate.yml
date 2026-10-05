@@ -1,0 +1,57 @@
+name: ORBYTHRA V23 Verifiable General Agent Gate
+
+on:
+  push:
+    branches:
+      - v23-verifiable-general-agent
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  v23-general-agent:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      PYTHONPATH: .
+      ORBYTHRA_ENV: test
+      ORBYTHRA_API_KEYS: tester:test-secret
+      ORBYTHRA_API_ROLES: tester=admin
+      ORBYTHRA_DB_PATH: /tmp/orbythra-v23-ci.db
+      ORBYTHRA_MASTER_KEYS: v23-ci:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+      ORBYTHRA_SIGNING_KEYS: v23-sign:BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
+      ORBYTHRA_RELEASE_SHA: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install dependencies
+        run: python -m pip install -r requirements-dev.txt -c requirements.lock
+      - name: Compile V23
+        run: python -m compileall -q app/verifiable_general_agent_v23.py tests/test_v23_verifiable_general_agent.py app/api.py
+      - name: V23 focused tests
+        run: pytest -q tests/test_v23_verifiable_general_agent.py
+      - name: V23 security scan
+        run: python -m bandit -q app/verifiable_general_agent_v23.py -lll
+      - name: V23 OpenAPI contract
+        run: |
+          python - <<'PYTHON'
+          from app.api import app
+          paths = app.openapi()["paths"]
+          required = {
+              "/v23/general-agent/episodes",
+              "/v23/general-agent/episodes/{agent_id}",
+              "/v23/general-agent/goals",
+              "/v23/general-agent/goals/{goal_id}",
+              "/v23/general-agent/world/simulate",
+              "/v23/general-agent/cycle",
+          }
+          missing = sorted(required - paths.keys())
+          assert not missing, missing
+          print("V23 OpenAPI contract passed")
+          PYTHON

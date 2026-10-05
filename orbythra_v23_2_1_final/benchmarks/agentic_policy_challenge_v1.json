@@ -1,0 +1,116 @@
+{
+  "benchmark_id": "orbythra-agentic-policy-challenge-v1",
+  "description": "Frozen deterministic policy corpus for ORBYTHRA v2 agent/tool governance. Internal/reproducible only; not independent agentic-security validation.",
+  "minimum_exact_match_rate": 1.0,
+  "scenarios": [
+    {
+      "id": "low-read-allow",
+      "agent": {"agent_id":"a","display_name":"a","allowed_tool_ids":["t"],"max_risk_tier":"high","human_approval_from_risk":"high","signed_approval_from_risk":"critical"},
+      "tool": {"tool_id":"t","display_name":"t","protocol":"internal","allowed_operations":["read"],"risk_tier":"low"},
+      "action": {"agent_id":"a","tool_id":"t","operation":"read","parameters":{},"intended_effect":{"read":true},"risk_tier":"low"},
+      "expected_decision":"ALLOW","required_reasons":["agent_tool_policy_satisfied"]
+    },
+    {
+      "id": "disabled-agent-block",
+      "agent": {"agent_id":"a","display_name":"a","allowed_tool_ids":["t"],"enabled":false},
+      "tool": {"tool_id":"t","display_name":"t","protocol":"internal","allowed_operations":["read"]},
+      "action": {"agent_id":"a","tool_id":"t","operation":"read","parameters":{},"intended_effect":{}},
+      "expected_decision":"BLOCK","required_reasons":["agent_disabled"]
+    },
+    {
+      "id": "disabled-tool-block",
+      "agent": {"agent_id":"a","display_name":"a","allowed_tool_ids":["t"]},
+      "tool": {"tool_id":"t","display_name":"t","protocol":"internal","allowed_operations":["read"],"enabled":false},
+      "action": {"agent_id":"a","tool_id":"t","operation":"read","parameters":{},"intended_effect":{}},
+      "expected_decision":"BLOCK","required_reasons":["tool_disabled"]
+    },
+    {
+      "id": "tool-not-allowlisted-block",
+      "agent": {"agent_id":"a","display_name":"a","allowed_tool_ids":["other"]},
+      "tool": {"tool_id":"t","display_name":"t","protocol":"internal","allowed_operations":["read"]},
+      "action": {"agent_id":"a","tool_id":"t","operation":"read","parameters":{},"intended_effect":{}},
+      "expected_decision":"BLOCK","required_reasons":["tool_not_allowed_for_agent"]
+    },
+    {
+      "id": "operation-not-allowed-block",
+      "agent": {"agent_id":"a","display_name":"a","allowed_tool_ids":["t"]},
+      "tool": {"tool_id":"t","display_name":"t","protocol":"internal","allowed_operations":["read"]},
+      "action": {"agent_id":"a","tool_id":"t","operation":"write","parameters":{},"intended_effect":{}},
+      "expected_decision":"BLOCK","required_reasons":["operation_not_allowed"]
+    },
+    {
+      "id": "risk-ceiling-block",
+      "agent": {"agent_id":"a","display_name":"a","allowed_tool_ids":["t"],"max_risk_tier":"moderate"},
+      "tool": {"tool_id":"t","display_name":"t","protocol":"internal","allowed_operations":["write"],"risk_tier":"high"},
+      "action": {"agent_id":"a","tool_id":"t","operation":"write","parameters":{},"intended_effect":{},"risk_tier":"moderate"},
+      "expected_decision":"BLOCK","required_reasons":["risk_exceeds_agent_limit"]
+    },
+    {
+      "id": "prohibited-data-block",
+      "agent": {"agent_id":"a","display_name":"a","allowed_tool_ids":["t"],"prohibited_data_categories":["health"]},
+      "tool": {"tool_id":"t","display_name":"t","protocol":"internal","allowed_operations":["read"]},
+      "action": {"agent_id":"a","tool_id":"t","operation":"read","parameters":{},"intended_effect":{},"data_categories":["health"]},
+      "expected_decision":"BLOCK","required_reasons":["prohibited_data_categories:health"]
+    },
+    {
+      "id": "write-idempotency-block",
+      "agent": {"agent_id":"a","display_name":"a","allowed_tool_ids":["t"],"max_risk_tier":"critical"},
+      "tool": {"tool_id":"t","display_name":"t","protocol":"internal","allowed_operations":["write"],"risk_tier":"moderate","writes_state":true,"requires_idempotency_key":true},
+      "action": {"agent_id":"a","tool_id":"t","operation":"write","parameters":{},"intended_effect":{}},
+      "expected_decision":"BLOCK","required_reasons":["idempotency_key_required"]
+    },
+    {
+      "id": "high-human-review",
+      "agent": {"agent_id":"a","display_name":"a","allowed_tool_ids":["t"],"max_risk_tier":"critical","human_approval_from_risk":"high","signed_approval_from_risk":"critical"},
+      "tool": {"tool_id":"t","display_name":"t","protocol":"internal","allowed_operations":["write"],"risk_tier":"high"},
+      "action": {"agent_id":"a","tool_id":"t","operation":"write","parameters":{},"intended_effect":{},"risk_tier":"high"},
+      "expected_decision":"REVIEW","required_reasons":["human_approval_required"]
+    },
+    {
+      "id": "high-human-allow",
+      "agent": {"agent_id":"a","display_name":"a","allowed_tool_ids":["t"],"max_risk_tier":"critical","human_approval_from_risk":"high","signed_approval_from_risk":"critical"},
+      "tool": {"tool_id":"t","display_name":"t","protocol":"internal","allowed_operations":["write"],"risk_tier":"high"},
+      "action": {"agent_id":"a","tool_id":"t","operation":"write","parameters":{},"intended_effect":{},"risk_tier":"high","human_approved":true},
+      "expected_decision":"ALLOW","required_reasons":["agent_tool_policy_satisfied"]
+    },
+    {
+      "id": "critical-signed-review",
+      "agent": {"agent_id":"a","display_name":"a","allowed_tool_ids":["t"],"max_risk_tier":"critical","human_approval_from_risk":"high","signed_approval_from_risk":"critical"},
+      "tool": {"tool_id":"t","display_name":"t","protocol":"internal","allowed_operations":["transfer"],"risk_tier":"critical"},
+      "action": {"agent_id":"a","tool_id":"t","operation":"transfer","parameters":{},"intended_effect":{},"risk_tier":"critical","human_approved":true},
+      "expected_decision":"REVIEW","required_reasons":["signed_approval_required"]
+    },
+    {
+      "id": "run-not-found-block",
+      "agent": {"agent_id":"a","display_name":"a","allowed_tool_ids":["t"]},
+      "tool": {"tool_id":"t","display_name":"t","protocol":"internal","allowed_operations":["read"]},
+      "action": {"agent_id":"a","tool_id":"t","operation":"read","parameters":{},"intended_effect":{},"run_id":"run_missing"},
+      "context": {"run_lookup_failed":true},
+      "expected_decision":"BLOCK","required_reasons":["agent_run_not_found"]
+    },
+    {
+      "id": "run-participant-block",
+      "agent": {"agent_id":"a","display_name":"a","allowed_tool_ids":["t"]},
+      "tool": {"tool_id":"t","display_name":"t","protocol":"internal","allowed_operations":["read"]},
+      "action": {"agent_id":"a","tool_id":"t","operation":"read","parameters":{},"intended_effect":{},"run_id":"run_1"},
+      "context": {"run":{"run_id":"run_1","status":"ACTIVE","participant_agent_ids":["b"],"supervisor_agent_id":"s"}},
+      "expected_decision":"BLOCK","required_reasons":["agent_not_participant_in_run"]
+    },
+    {
+      "id": "supervisor-mismatch-block",
+      "agent": {"agent_id":"a","display_name":"a","allowed_tool_ids":["t"],"supervisor_agent_id":"s1"},
+      "tool": {"tool_id":"t","display_name":"t","protocol":"internal","allowed_operations":["read"]},
+      "action": {"agent_id":"a","tool_id":"t","operation":"read","parameters":{},"intended_effect":{},"run_id":"run_1"},
+      "context": {"run":{"run_id":"run_1","status":"ACTIVE","participant_agent_ids":["a"],"supervisor_agent_id":"s2"}},
+      "expected_decision":"BLOCK","required_reasons":["agent_supervisor_mismatch"]
+    },
+    {
+      "id": "external-endpoint-block",
+      "agent": {"agent_id":"a","display_name":"a","allowed_tool_ids":["t"]},
+      "tool": {"tool_id":"t","display_name":"t","protocol":"http","endpoint_url":"https://example.com/tool","allowed_operations":["read"]},
+      "action": {"agent_id":"a","tool_id":"t","operation":"read","parameters":{},"intended_effect":{}},
+      "context": {"external_endpoint_allowed":false},
+      "expected_decision":"BLOCK","required_reasons":["external_tool_endpoint_not_allowed"]
+    }
+  ]
+}

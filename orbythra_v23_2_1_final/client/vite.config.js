@@ -1,0 +1,1 @@
+import{defineConfig}from"vite";import react from"@vitejs/plugin-react";export default defineConfig({plugins:[react()],server:{port:5173,proxy:{"/v1":"http://127.0.0.1:8000","/v2":"http://127.0.0.1:8000","/v3":"http://127.0.0.1:8000","/v4":"http://127.0.0.1:8000","/v5":"http://127.0.0.1:8000","/v5.1":"http://127.0.0.1:8000"}}});

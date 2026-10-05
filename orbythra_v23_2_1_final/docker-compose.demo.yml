@@ -1,0 +1,110 @@
+services:
+  ollama:
+    image: ${ORBYTHRA_OLLAMA_IMAGE:-ollama/ollama:latest}
+    restart: unless-stopped
+    volumes:
+      - orbythra-ollama:/root/.ollama
+    expose:
+      - "11434"
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 5s
+      timeout: 5s
+      start_period: 10s
+      retries: 30
+
+  ollama-init:
+    image: ${ORBYTHRA_OLLAMA_IMAGE:-ollama/ollama:latest}
+    depends_on:
+      ollama:
+        condition: service_healthy
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    command: ["pull", "${ORBYTHRA_LOCAL_MODEL_ID:-qwen2.5:0.5b}"]
+    restart: "no"
+
+  local-llm:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      ollama-init:
+        condition: service_completed_successfully
+    environment:
+      ORBYTHRA_OLLAMA_URL: http://ollama:11434
+      ORBYTHRA_LOCAL_MODEL_ID: ${ORBYTHRA_LOCAL_MODEL_ID:-qwen2.5:0.5b}
+    command: ["uvicorn", "app.local_llm_bridge:app", "--host", "0.0.0.0", "--port", "9000"]
+    expose:
+      - "9000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:9000/health', timeout=2).read()"]
+      interval: 5s
+      timeout: 3s
+      start_period: 5s
+      retries: 10
+
+  api:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      local-llm:
+        condition: service_healthy
+    environment:
+      ORBYTHRA_ENV: development
+      ORBYTHRA_DB_PATH: /data/orbythra-demo.db
+      ORBYTHRA_API_KEYS: "demo:orbythra-demo-local-key-change-before-sharing"
+      ORBYTHRA_API_ROLES: demo=admin
+      ORBYTHRA_MASTER_KEYS: "demo-master:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+      ORBYTHRA_SIGNING_KEYS: "demo-signing:BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB"
+      ORBYTHRA_CRYPTO_ALGORITHM: aes256-gcm
+      ORBYTHRA_PQC_MODE: "off"
+      ORBYTHRA_ALLOW_LEGACY_APPROVALS: "true"
+      ORBYTHRA_RATE_LIMIT_PER_MINUTE: "120"
+      ORBYTHRA_MAX_BODY_BYTES: "2000000"
+      ORBYTHRA_RELEASE_SHA: "local-demo-release-0000000000000000000000000000000000000001"
+      ORBYTHRA_DEFAULT_MODEL_ID: ${ORBYTHRA_DEFAULT_MODEL_ID:-default}
+      ORBYTHRA_EVIDENCE_PROVIDER_URL: ${ORBYTHRA_EVIDENCE_PROVIDER_URL:-}
+      ORBYTHRA_EVIDENCE_PROVIDER_TOKEN: ${ORBYTHRA_EVIDENCE_PROVIDER_TOKEN:-}
+      ORBYTHRA_LLM_PROVIDER_URL: ${ORBYTHRA_LLM_PROVIDER_URL:-http://local-llm:9000}
+      ORBYTHRA_LLM_PROVIDER_TOKEN: ${ORBYTHRA_LLM_PROVIDER_TOKEN:-}
+      SERPAPI_API_KEY: ${SERPAPI_API_KEY:-}
+      SERPAPI_KEY: ${SERPAPI_KEY:-}
+      SERPAPI_HL: ${SERPAPI_HL:-}
+      SERPAPI_GL: ${SERPAPI_GL:-}
+      SERPAPI_LOCATION: ${SERPAPI_LOCATION:-}
+      GOOGLE_SEARCH_API_KEY: ${GOOGLE_SEARCH_API_KEY:-}
+      GOOGLE_SEARCH_ENGINE_ID: ${GOOGLE_SEARCH_ENGINE_ID:-}
+      ORBYTHRA_KEYLESS_SEARCH: ${ORBYTHRA_KEYLESS_SEARCH:-true}
+    volumes:
+      - orbythra-demo-data:/data
+    expose:
+      - "8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/ready', timeout=2).read()"]
+      interval: 5s
+      timeout: 3s
+      start_period: 10s
+      retries: 10
+
+  frontend:
+    build:
+      context: ./client
+      args:
+        VITE_API_BASE_URL: /api
+    environment:
+      ORBYTHRA_DEMO_PROXY_KEY: orbythra-demo-local-key-change-before-sharing
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "${ORBYTHRA_DEMO_HOST:-127.0.0.1}:${ORBYTHRA_DEMO_PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/healthz"]
+      interval: 5s
+      timeout: 3s
+      start_period: 5s
+      retries: 10
+
+volumes:
+  orbythra-demo-data:
+  orbythra-ollama:

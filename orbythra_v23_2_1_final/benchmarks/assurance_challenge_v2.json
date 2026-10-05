@@ -1,0 +1,115 @@
+{
+  "benchmark_id": "orbythra-assurance-challenge-v2",
+  "description": "Frozen deterministic challenge corpus for evidence-gate behavior. This is internal/reproducible test evidence, not independent validation or a population-level hallucination benchmark.",
+  "fixed_now": "2026-09-30T00:00:00+00:00",
+  "minimum_exact_match_rate": 1.0,
+  "scenarios": [
+    {
+      "id": "supported-authoritative",
+      "minimum_support": 0.75,
+      "minimum_authority": 0.60,
+      "max_age_days": 30,
+      "claims": [{"id":"c1","text":"supported claim","evidence_ids":["e1"],"time_sensitive":false}],
+      "evidence": [{"id":"e1","support":0.95,"authority":0.90,"retrieved_at":"2026-09-29T00:00:00+00:00","contradicts":false}],
+      "expected_disposition": "ANSWER",
+      "expected_statuses": ["SUPPORTED"]
+    },
+    {
+      "id": "missing-evidence",
+      "claims": [{"id":"c1","text":"unbound claim","evidence_ids":[],"time_sensitive":false}],
+      "evidence": [],
+      "expected_disposition": "ABSTAIN_OR_QUALIFY",
+      "expected_statuses": ["INSUFFICIENT_EVIDENCE"]
+    },
+    {
+      "id": "unknown-evidence-reference",
+      "claims": [{"id":"c1","text":"unknown binding","evidence_ids":["does-not-exist"],"time_sensitive":false}],
+      "evidence": [],
+      "expected_disposition": "ABSTAIN_OR_QUALIFY",
+      "expected_statuses": ["INSUFFICIENT_EVIDENCE"]
+    },
+    {
+      "id": "contradiction-dominates",
+      "claims": [{"id":"c1","text":"contradicted claim","evidence_ids":["e1","e2"],"time_sensitive":false}],
+      "evidence": [
+        {"id":"e1","support":1.0,"authority":1.0,"retrieved_at":"2026-09-29T00:00:00+00:00","contradicts":false},
+        {"id":"e2","support":1.0,"authority":1.0,"retrieved_at":"2026-09-29T00:00:00+00:00","contradicts":true}
+      ],
+      "expected_disposition": "ABSTAIN_OR_QUALIFY",
+      "expected_statuses": ["CONTRADICTED"]
+    },
+    {
+      "id": "stale-time-sensitive",
+      "max_age_days": 30,
+      "claims": [{"id":"c1","text":"current claim","evidence_ids":["e1"],"time_sensitive":true}],
+      "evidence": [{"id":"e1","support":1.0,"authority":1.0,"retrieved_at":"2026-07-01T00:00:00+00:00","contradicts":false}],
+      "expected_disposition": "ABSTAIN_OR_QUALIFY",
+      "expected_statuses": ["STALE_EVIDENCE"]
+    },
+    {
+      "id": "undated-time-sensitive",
+      "max_age_days": 30,
+      "claims": [{"id":"c1","text":"undated current claim","evidence_ids":["e1"],"time_sensitive":true}],
+      "evidence": [{"id":"e1","support":1.0,"authority":1.0,"contradicts":false}],
+      "expected_disposition": "ABSTAIN_OR_QUALIFY",
+      "expected_statuses": ["STALE_EVIDENCE"]
+    },
+    {
+      "id": "low-authority",
+      "minimum_support": 0.75,
+      "minimum_authority": 0.60,
+      "claims": [{"id":"c1","text":"weak source claim","evidence_ids":["e1"],"time_sensitive":false}],
+      "evidence": [{"id":"e1","support":0.95,"authority":0.30,"retrieved_at":"2026-09-29T00:00:00+00:00","contradicts":false}],
+      "expected_disposition": "ABSTAIN_OR_QUALIFY",
+      "expected_statuses": ["LOW_AUTHORITY"]
+    },
+    {
+      "id": "low-support",
+      "minimum_support": 0.75,
+      "minimum_authority": 0.60,
+      "claims": [{"id":"c1","text":"weakly supported claim","evidence_ids":["e1"],"time_sensitive":false}],
+      "evidence": [{"id":"e1","support":0.40,"authority":0.95,"retrieved_at":"2026-09-29T00:00:00+00:00","contradicts":false}],
+      "expected_disposition": "ABSTAIN_OR_QUALIFY",
+      "expected_statuses": ["INSUFFICIENT_EVIDENCE"]
+    },
+    {
+      "id": "threshold-boundary-supported",
+      "minimum_support": 0.75,
+      "minimum_authority": 0.60,
+      "claims": [{"id":"c1","text":"boundary claim","evidence_ids":["e1"],"time_sensitive":false}],
+      "evidence": [{"id":"e1","support":0.75,"authority":0.60,"retrieved_at":"2026-09-29T00:00:00+00:00","contradicts":false}],
+      "expected_disposition": "ANSWER",
+      "expected_statuses": ["SUPPORTED"]
+    },
+    {
+      "id": "mixed-claims-fail-closed",
+      "claims": [
+        {"id":"c1","text":"good claim","evidence_ids":["e1"],"time_sensitive":false},
+        {"id":"c2","text":"unsupported claim","evidence_ids":[],"time_sensitive":false}
+      ],
+      "evidence": [{"id":"e1","support":0.95,"authority":0.90,"retrieved_at":"2026-09-29T00:00:00+00:00","contradicts":false}],
+      "expected_disposition": "ABSTAIN_OR_QUALIFY",
+      "expected_statuses": ["SUPPORTED","INSUFFICIENT_EVIDENCE"]
+    },
+    {
+      "id": "fresh-time-sensitive-supported",
+      "max_age_days": 30,
+      "claims": [{"id":"c1","text":"fresh current claim","evidence_ids":["e1"],"time_sensitive":true}],
+      "evidence": [{"id":"e1","support":0.90,"authority":0.90,"retrieved_at":"2026-09-29T00:00:00+00:00","contradicts":false}],
+      "expected_disposition": "ANSWER",
+      "expected_statuses": ["SUPPORTED"]
+    },
+    {
+      "id": "multi-source-average-below-support",
+      "minimum_support": 0.75,
+      "minimum_authority": 0.60,
+      "claims": [{"id":"c1","text":"averaged claim","evidence_ids":["e1","e2"],"time_sensitive":false}],
+      "evidence": [
+        {"id":"e1","support":1.0,"authority":0.95,"retrieved_at":"2026-09-29T00:00:00+00:00","contradicts":false},
+        {"id":"e2","support":0.20,"authority":0.95,"retrieved_at":"2026-09-29T00:00:00+00:00","contradicts":false}
+      ],
+      "expected_disposition": "ABSTAIN_OR_QUALIFY",
+      "expected_statuses": ["INSUFFICIENT_EVIDENCE"]
+    }
+  ]
+}

@@ -1,0 +1,320 @@
+name: ORBYTHRA FastAPI CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: .
+      ORBYTHRA_ENV: test
+      ORBYTHRA_API_KEYS: ci:ci-test-key
+      ORBYTHRA_API_ROLES: ci=admin
+      ORBYTHRA_DB_PATH: /tmp/orbythra-ci.db
+      ORBYTHRA_RATE_LIMIT_PER_MINUTE: 100
+      ORBYTHRA_MASTER_KEYS: ci-million:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+      ORBYTHRA_SIGNING_KEYS: ci-signing:BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
+      ORBYTHRA_RELEASE_SHA: ${{ github.sha }}
+      ORBYTHRA_DEPLOYMENT_ID: ci-${{ github.run_id }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install dependencies
+        run: python -m pip install -r requirements-dev.txt -c requirements.lock
+      - name: Validate secure demo compose
+        run: docker compose -f docker-compose.demo.yml config -q
+      - name: Validate production compose
+        env:
+          POSTGRES_PASSWORD: ci-postgres
+          ORBYTHRA_API_KEYS: ci:ci-test-key
+          ORBYTHRA_MASTER_KEYS: ci-million:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+          ORBYTHRA_SIGNING_KEYS: ci-signing:BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
+        run: docker compose -f docker-compose.production.yml config -q
+      - name: Build production frontend container
+        run: docker build -t orbythra-frontend-ci ./client
+      - name: Production frontend API PostgreSQL runtime smoke
+        env:
+          POSTGRES_PASSWORD: ci-postgres
+        run: |
+          trap 'docker compose -f docker-compose.production.yml down -v' EXIT
+          docker compose -f docker-compose.production.yml up --build --wait --wait-timeout 120
+          docker compose -f docker-compose.production.yml exec -T frontend nginx -t
+          python - <<'PYTHON'
+          import json, urllib.request, urllib.error
+          base = 'http://127.0.0.1:8080/api'
+          with urllib.request.urlopen(base + '/ready', timeout=10) as response:
+              assert json.load(response)['database_ready'] is True
+          try:
+              urllib.request.urlopen(base + '/v9/trust/readiness', timeout=10)
+          except urllib.error.HTTPError as error:
+              assert error.code == 401
+          else:
+              raise AssertionError('missing credentials accepted')
+          request = urllib.request.Request(base + '/v9/trust/readiness', headers={'X-API-Key': 'ci-test-key'})
+          with urllib.request.urlopen(request, timeout=10) as response:
+              assert json.load(response)['persistent_validator_registry'] is True
+          print('Production nginx/API/PostgreSQL readiness and auth passed')
+          PYTHON
+      - name: Build React client
+        run: |
+          cd client
+          npm ci --no-audit --no-fund
+          npm run build
+          npm audit --audit-level=moderate
+      - name: Compile application
+        run: python -m compileall -q app scripts
+      - name: Run tests
+        run: python -m pytest -q --junitxml=/tmp/orbythra-tests.xml
+      - name: V22 cryptographic hardening tests
+        run: pytest -q tests/test_v22_crypto_hardening.py
+      - name: One-million-case adversarial crypto gate
+        run: python scripts/million_case_crypto_gate.py --cases 1000000
+
+      - name: Frozen assurance benchmark v2 gate
+        run: |
+          python scripts/benchmark_gate.py > /tmp/orbythra-assurance-v2.json
+          python -m json.tool /tmp/orbythra-assurance-v2.json >/dev/null
+      - name: Expanded assurance benchmark v3 gate
+        run: |
+          python scripts/benchmark_gate.py benchmarks/assurance_challenge_v3.json > /tmp/orbythra-assurance-v3.json
+          python -m json.tool /tmp/orbythra-assurance-v3.json >/dev/null
+      - name: Frozen agentic policy benchmark gate
+        run: |
+          python scripts/agent_policy_gate.py > /tmp/orbythra-agentic-policy.json
+          python -m json.tool /tmp/orbythra-agentic-policy.json >/dev/null
+      - name: Frozen autonomy planning benchmark gate
+        run: |
+          python scripts/autonomy_planning_gate.py > /tmp/orbythra-autonomy-planning.json
+          python -m json.tool /tmp/orbythra-autonomy-planning.json >/dev/null
+      - name: Frozen adaptive generalist benchmark gate
+        run: |
+          python scripts/adaptive_generalist_gate.py > /tmp/orbythra-adaptive-generalist.json
+          python -m json.tool /tmp/orbythra-adaptive-generalist.json >/dev/null
+      - name: Governed generalist v5 frozen benchmark gate
+        run: |
+          python scripts/generalist_v5_gate.py > /tmp/orbythra-generalist-v5.json
+          python -m json.tool /tmp/orbythra-generalist-v5.json >/dev/null
+      - name: V5.1 generalization hardening frozen gate
+        run: |
+          python scripts/generalization_hardening_v51_gate.py > /tmp/orbythra-v51.json
+          python -m json.tool /tmp/orbythra-v51.json >/dev/null
+      - name: Semantic verifier hardening tests
+        run: pytest -q tests/test_semantic_verifier_hardening.py
+      - name: Frozen NLI calibration gate
+        run: python scripts/nli_calibration_gate.py > /tmp/orbythra-nli-calibration.json
+      - name: V6 frozen verifiable intelligence gate
+        run: |
+          python scripts/verifiable_intelligence_v6_gate.py > /tmp/orbythra-v6.json
+          python -m json.tool /tmp/orbythra-v6.json >/dev/null
+      - name: V7 frozen governed agent gate
+        run: |
+          python scripts/governed_agents_v7_gate.py > /tmp/orbythra-v7.json
+          python -m json.tool /tmp/orbythra-v7.json >/dev/null
+      - name: V8 frozen temporal reality gate
+        run: |
+          python scripts/temporal_reality_v8_gate.py > /tmp/orbythra-v8.json
+          python -m json.tool /tmp/orbythra-v8.json >/dev/null
+      - name: V9 frozen distributed verification gate
+        run: |
+          python scripts/distributed_verification_v9_gate.py > /tmp/orbythra-v9.json
+          python -m json.tool /tmp/orbythra-v9.json >/dev/null
+      - name: V10 frozen AI operating layer gate
+        run: |
+          python scripts/ai_operating_layer_v10_gate.py > /tmp/orbythra-v10.json
+          python -m json.tool /tmp/orbythra-v10.json >/dev/null
+      - name: V10 hardening focused tests
+        run: pytest -q tests/test_v10_hardening_gaps.py
+      - name: V11H cognitive hardening tests
+        run: pytest -q tests/test_cognitive_hardening_v11h.py
+      - name: Frozen unseen-task cross-domain cognitive gate
+        run: python scripts/cognitive_generalization_v11h_gate.py > /tmp/orbythra-v11h-cognitive.json
+      - name: V11 frozen causal intelligence gate
+        run: |
+          python scripts/causal_intelligence_v11_gate.py > /tmp/orbythra-v11.json
+          python -m json.tool /tmp/orbythra-v11.json >/dev/null
+      - name: V11 technical-debt adversarial hardening
+        run: pytest -q tests/test_v11_technical_debt_hardening.py
+      - name: Ledger and observability hardening tests
+        run: pytest -q tests/test_ledger_observability_hardening.py
+      - name: V5.1 anti-leakage protocol syntax gate
+        run: python -m json.tool benchmarks/anti_leakage_protocol_v51.json >/dev/null
+      - name: V5.1 reproducibility manifest syntax gate
+        run: python -m json.tool benchmarks/reproducibility_manifest_v51.json >/dev/null
+      - name: External validation protocol syntax gate
+        run: python -m json.tool benchmarks/external_validation_protocol_v1.json >/dev/null
+      - name: Deterministic performance smoke gate
+        run: |
+          python scripts/performance_gate.py > /tmp/orbythra-performance.json
+          python -m json.tool /tmp/orbythra-performance.json >/dev/null
+      - name: Kubernetes production deployment hardening gate
+        run: |
+          python scripts/deployment_gate.py > /tmp/orbythra-deployment-gate.json
+          python -m json.tool /tmp/orbythra-deployment-gate.json >/dev/null
+      - name: Backup restore integrity drill
+        run: |
+          ORBYTHRA_DB_PATH=/tmp/orbythra-fastapi-tests.db python scripts/restore_drill.py > /tmp/orbythra-restore-drill.json
+          python -m json.tool /tmp/orbythra-restore-drill.json >/dev/null
+      - name: Database corruption fault-injection recovery gate
+        run: python scripts/dr_fault_injection_gate.py > /tmp/orbythra-dr-fault.json
+      - name: React credential persistence guard
+        run: |
+          ! grep -R 'localStorage.*orbythra-key' client/src
+          grep -q 'window.confirm' client/src/main.jsx
+      - name: Static security scan
+        run: python -m bandit -q -r app -lll
+      - name: Dependency vulnerability audit
+        run: python -m pip_audit -r requirements.lock --progress-spinner=off
+      - name: Generate CycloneDX SBOM
+        run: |
+          python -m pip_audit -r requirements.lock --progress-spinner=off -f cyclonedx-json -o /tmp/orbythra-sbom.cdx.json
+          python -m json.tool /tmp/orbythra-sbom.cdx.json >/dev/null
+      - name: Repository secret scan
+        run: python scripts/secret_scan.py
+      - name: Generate release evidence manifest
+        run: |
+          python scripts/release_evidence.py > /tmp/orbythra-release-evidence.json
+          python -m json.tool /tmp/orbythra-release-evidence.json >/dev/null
+      - name: Generate external validation handoff bundle
+        run: |
+          python scripts/validation_bundle.py > /tmp/orbythra-validation-bundle.json
+          python -m json.tool /tmp/orbythra-validation-bundle.json >/dev/null
+      - name: Production composition and OpenAPI smoke test
+        run: |
+          python - <<'PY'
+          from app.api import app
+          schema = app.openapi()
+          assert app.title == 'ORBYTHRA API'
+          required = [
+              '/v1/pilot/run',
+              '/v1/evidence/snapshots',
+              '/v1/metrics',
+              '/v1/crypto/status',
+              '/v1/crypto/commit',
+              '/v1/crypto/seal',
+              '/v1/crypto/open',
+              '/v1/crypto/open-recipient',
+              '/v1/crypto/open-hybrid-recipient',
+              '/v1/privacy/records',
+              '/v1/privacy/subjects/export',
+              '/v1/privacy/records/rectify',
+              '/v1/privacy/subjects/restrict',
+              '/v1/privacy/subjects/withdraw-consent',
+              '/v1/privacy/subjects/erase',
+              '/v1/privacy/retention/purge',
+              '/v1/privacy/inventory',
+              '/v1/privacy/status',
+              '/v1/privacy/breaches',
+              '/v1/privacy/breaches/open',
+              '/v1/enterprise/providers',
+              '/v1/enterprise/policies/{policy_id}',
+              '/v1/enterprise/policies/{policy_id}/history',
+              '/v1/enterprise/policies/{policy_id}/activate/{revision}',
+              '/v1/enterprise/identities/{subject}',
+              '/v1/enterprise/identities',
+              '/v1/enterprise/policy/evaluate',
+              '/v1/enterprise/models/invoke',
+              '/v1/enterprise/benchmarks/run',
+              '/v1/enterprise/benchmarks/{run_id}',
+              '/v1/enterprise/usage/events',
+              '/v1/enterprise/usage/report',
+              '/v1/enterprise/production/readiness',
+              '/v1/enterprise/readiness',
+              '/v1/system/version',
+              '/v1/system/assurance-manifest',
+              '/v1/validation/protocol',
+              '/v1/validation/readiness',
+              '/v2/agents/registry',
+              '/v2/agents/tools',
+              '/v2/agents/runs',
+              '/v2/agents/runs/{run_id}',
+              '/v2/agents/actions/propose',
+              '/v2/agents/actions/{action_id}',
+              '/v2/agents/actions/{action_id}/authorize',
+              '/v2/agents/actions/{action_id}/revalidate',
+              '/v2/agents/actions/{action_id}/execution-check',
+              '/v2/agents/actions/{action_id}/outcome',
+              '/v2/agents/runs/{run_id}/supervision',
+              '/v2/agents/runs/{run_id}/complete',
+              '/v2/agents/readiness',
+              '/v3/autonomy/memory',
+              '/v3/autonomy/memory/query',
+              '/v3/autonomy/skills',
+              '/v3/autonomy/missions',
+              '/v3/autonomy/missions/{mission_id}',
+              '/v3/autonomy/missions/{mission_id}/plan',
+              '/v3/autonomy/missions/{mission_id}/drift',
+              '/v3/autonomy/missions/{mission_id}/evaluate',
+              '/v3/autonomy/readiness',
+              '/v4/adaptive/world-state',
+              '/v4/adaptive/world-state/{agent_id}/{domain}',
+              '/v4/adaptive/learning/candidates',
+              '/v4/adaptive/learning/{learning_id}/history',
+              '/v4/adaptive/learning/{learning_id}/activate',
+              '/v4/adaptive/learning/{learning_id}/rollback',
+              '/v4/adaptive/transfer/propose',
+              '/v4/adaptive/strategies',
+              '/v4/adaptive/route',
+              '/v4/adaptive/readiness',
+              '/v4.5/validation/evidence',
+              '/v4.5/validation/verify',
+              '/v4.5/validation/export',
+              '/v5/generalist/evaluate',
+              '/v5/generalist/evaluations/{evaluation_id}',
+              '/v5/generalist/ledger/verify',
+              '/v5/generalist/readiness',
+              '/v5/validation/blind-challenges/execute',
+              '/v5/validation/release-readiness',
+              '/v5.1/validators',
+              '/v5.1/hardening/evaluate',
+              '/v5.1/readiness',
+              '/v6/verifiable-intelligence/verify',
+              '/v6/verifiable-intelligence/readiness',
+              '/v7/agents/simulate',
+              '/v7/agents/recovery',
+              '/v7/agents/readiness',
+              '/v8/temporal/facts',
+              '/v8/temporal/snapshot',
+              '/v8/temporal/stale',
+              '/v8/temporal/readiness',
+              '/v9/trust/validators',
+              '/v9/trust/quorum',
+              '/v9/trust/readiness',
+              '/v10/operate',
+              '/v10/operate/readiness',
+              '/v10/providers/invoke',
+              '/v10/providers/readiness',
+              '/v11/causal/evaluate',
+              '/v11/causal/readiness',
+              '/v11h/cognitive/decide',
+              '/v11h/cognitive/metacognition',
+              '/v11h/cognitive/readiness',
+              '/v1/observability/health',
+              '/v1/observability/readiness',
+              '/v1/observability/metrics',
+          ]
+          for path in required:
+              assert path in schema['paths'], path
+          PY
+      - name: Preserve internal verification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: orbythra-internal-evidence-${{ github.sha }}
+          path: |
+            /tmp/orbythra-*.json
+            /tmp/orbythra-tests.xml
+            requirements.lock
+            client/package-lock.json
+          if-no-files-found: error
+          retention-days: 30
