@@ -148,3 +148,5 @@ button,input,textarea,select{font:inherit;color:inherit}button{cursor:pointer}a{
 }
 @media(max-width:620px){.msg.user .bubble{max-width:92%}.evstats{grid-template-columns:1fr 1fr}.topright .pill:not(:last-child){display:none}.composerfoot{justify-content:center}.hint{display:none}}
 .reviewnote{display:flex;gap:7px;align-items:center;margin:0 0 10px;color:#f0c96b;background:#2a2411;border:1px solid #5f5126;border-radius:8px;padding:8px 10px;font-size:11px}
+
+.langselect{background:var(--panel,#111827);color:inherit;border:1px solid var(--line,#334155);border-radius:8px;padding:5px 8px;font:inherit;max-width:132px}.langselect:focus{outline:2px solid currentColor;outline-offset:1px}html[dir="rtl"] .appshell{direction:rtl}html[dir="rtl"] .md,html[dir="rtl"] textarea,html[dir="rtl"] input{text-align:right}

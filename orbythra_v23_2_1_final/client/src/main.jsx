@@ -2,6 +2,7 @@ import React,{useEffect,useMemo,useRef,useState}from"react";
 import{createRoot}from"react-dom/client";
 import{Search,Play,RefreshCw,ShieldCheck,KeyRound,ChevronRight,ChevronDown,Server,CheckCircle2,XCircle,Paperclip,FileText,X,Globe,Plus,MessageSquare,Trash2,Activity,Download,Code2,Send,Sparkles,Menu,Settings,AlertTriangle,Clock,Hash,Wrench,Database,Lock,Cpu,Layers,BookOpen,Copy}from"lucide-react";
 import{downloadFile,openapi,operations,request,starterBody,upload}from"./api";
+import{LANGUAGES,getUiLanguage,installUiTranslation,setUiLanguage,translateUiText}from"./ui_i18n";
 import"./styles.css";
 
 /* ------------------------------------------------------------------ helpers */
@@ -206,7 +207,7 @@ function Chat({chat,updateChat,apiKey,workspaceId,readiness}){
      <span className={readiness.release_binding_configured?"on":""}>{readiness.release_binding_configured?<CheckCircle2 size={11}/>:<XCircle size={11}/>} Sürüm bağlama</span>
      <span className={readiness.fail_closed_assurance?"on":""}><Lock size={11}/> Kapalı-başarısız güvence</span>
     </div>}
-    <div className="examples">{EXAMPLES.map(e=><button key={e.t} onClick={()=>{setMode(e.m);send(e.t,e.m)}}><b>{e.t}<small>{e.d}</small></b><ChevronRight size={14}/></button>)}</div>
+    <div className="examples">{EXAMPLES.map(e=><button key={e.t} onClick={()=>{const q=translateUiText(e.t);setMode(e.m);send(q,e.m)}}><b>{e.t}<small>{e.d}</small></b><ChevronRight size={14}/></button>)}</div>
    </div>}
    {chat.messages.map(m=>m.role==="user"?<UserMessage key={m.id} msg={m}/>:<AssistantMessage key={m.id} msg={m} apiKey={apiKey} workspaceId={workspaceId}/>)}
    {busy&&<Thinking/>}
@@ -299,6 +300,7 @@ function Advanced({apiKey,setApiKey,workspaceId,setWorkspaceId}){
 /* ------------------------------------------------------------------ app shell */
 function App(){
  const[view,setView]=useState("chat");
+ const[uiLanguage]=useState(()=>getUiLanguage());
  const[apiKey,setApiKey]=useState("");
  const[workspaceId,setWorkspaceId]=useState(sessionStorage.getItem("orbythra-workspace")||"default");
  const[chats,setChats]=useState(()=>{const c=loadChats();return c.length?c:[{id:uid(),title:"",messages:[],at:Date.now()}]});
@@ -323,11 +325,12 @@ function App(){
    <div className="boundary"><ShieldCheck size={13}/> Normalize → İddia → Kanıt → Güvence</div>
   </aside>
   <main className="content">
-   <header className="topbar"><button className="menubtn" onClick={()=>setSideOpen(true)}><Menu size={18}/></button><div><p className="eyebrow">ORBYTHRA</p><b>{view==="chat"?(active?.title||"Doğrulanabilir sohbet asistanı"):view==="status"?"Sistem durumu ve yetenek kanıtı":"Geliştirici kontrol düzlemi"}</b></div><div className="topright">{readiness&&<span className={"pill "+(readiness.web_search_configured?"on":"")}><Globe size={11}/> {readiness.web_search_configured?"Web açık":"Web kapalı"}</span>}{readiness&&<span className={"pill "+(readiness.llm_provider_configured?"on":"warn")}><Cpu size={11}/> {readiness.llm_provider_configured?"LLM bağlı":"LLM yok · çıkarımsal"}</span>}<span className="pill"><Hash size={11}/> {workspaceId}</span></div></header>
+   <header className="topbar"><button className="menubtn" onClick={()=>setSideOpen(true)}><Menu size={18}/></button><div><p className="eyebrow">ORBYTHRA</p><b>{view==="chat"?(active?.title||"Doğrulanabilir sohbet asistanı"):view==="status"?"Sistem durumu ve yetenek kanıtı":"Geliştirici kontrol düzlemi"}</b></div><div className="topright"><select className="langselect" value={uiLanguage} onChange={e=>setUiLanguage(e.target.value)} aria-label="Interface language">{LANGUAGES.map(([code,label])=><option key={code} value={code}>{label}</option>)}</select>{readiness&&<span className={"pill "+(readiness.web_search_configured?"on":"")}><Globe size={11}/> {readiness.web_search_configured?"Web açık":"Web kapalı"}</span>}{readiness&&<span className={"pill "+(readiness.llm_provider_configured?"on":"warn")}><Cpu size={11}/> {readiness.llm_provider_configured?"LLM bağlı":"LLM yok · çıkarımsal"}</span>}<span className="pill"><Hash size={11}/> {workspaceId}</span></div></header>
    {view==="chat"&&active&&<Chat key={active.id} chat={active} updateChat={updateChat} apiKey={apiKey} workspaceId={workspaceId} readiness={readiness}/>}
    {view==="status"&&<SystemStatus apiKey={apiKey} workspaceId={workspaceId}/>}
    {view==="advanced"&&<Advanced apiKey={apiKey} setApiKey={setApiKey} workspaceId={workspaceId} setWorkspaceId={setWorkspaceId}/>}
   </main>
  </div>;
 }
+installUiTranslation();
 createRoot(document.getElementById("root")).render(<App/>);

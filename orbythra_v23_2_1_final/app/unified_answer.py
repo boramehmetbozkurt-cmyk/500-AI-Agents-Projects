@@ -34,6 +34,35 @@ _WORD = re.compile(r"[^\W_]+", re.UNICODE)
 _SENTENCE = re.compile(r"(?<=[.!?])\s+")
 
 
+_LANGUAGE_NAMES = {
+    "en": "English", "tr": "Turkish", "de": "German", "fr": "French",
+    "es": "Spanish", "it": "Italian", "ar": "Arabic",
+}
+
+def _detect_language(text: str) -> str:
+    """Best-effort query language detection for the seven supported UI languages.
+
+    This intentionally avoids an external dependency. It is used only to tell the
+    answer generator which language to reply in; it is not treated as evidence.
+    """
+    raw = text.casefold()
+    if re.search(r"[\u0600-\u06ff]", raw):
+        return "ar"
+    q = " " + re.sub(r"[^\w'’]+", " ", raw, flags=re.UNICODE) + " "
+    if re.search(r"[\u0600-\u06ff]", q):
+        return "ar"
+    markers = {
+        "tr": (" nedir ", " kimdir ", " nasıl ", " neden ", " hangi ", " ne zaman ", " için ", " hakkında ", "ş", "ğ", "ı"),
+        "de": (" was ist ", " wer ist ", " wie ", " warum ", " welche ", " und ", " der ", " die ", " das ", " für ", "ß"),
+        "fr": (" qu'est-ce ", " qu'est ce ", " qui est ", " comment ", " pourquoi ", " quel ", " quelle ", " les ", " des ", " pour ", "ç", "œ"),
+        "es": (" qué es ", " quien es ", " quién es ", " cómo ", " por qué ", " cual ", " cuál ", " para ", " los ", " las ", "¿", "ñ"),
+        "it": (" che cos'è ", " che cosa ", " chi è ", " come ", " perché ", " quale ", " per ", " gli ", " della ", " è "),
+    }
+    scores = {lang: sum(2 if len(m.strip()) > 2 else 1 for m in marks if m in q) for lang, marks in markers.items()}
+    best = max(scores, key=scores.get)
+    return best if scores[best] > 0 else "en"
+
+
 class UnifiedAnswerRequest(BaseModel):
     query: str = Field(min_length=3, max_length=12000)
     mode: Literal["AUTO", "WEB_RESEARCH", "AI_ANALYSIS"] = "AUTO"
@@ -66,6 +95,7 @@ class PipelineStep(BaseModel):
 
 class UnifiedAnswerResponse(BaseModel):
     query: str
+    answer_language: str | None = None
     status: Literal["PASS", "REVIEW", "BLOCKED", "ERROR"]
     answer: str | None = None
     confidence: float | None = None
@@ -336,14 +366,17 @@ def _source_pack(query: str, sources: list[UnifiedSource], texts: dict[str, str]
 
 
 def _generate_answer(
-    *, query: str, model_id: str, sources: list[UnifiedSource], texts: dict[str, str]
+    *, query: str, model_id: str, sources: list[UnifiedSource], texts: dict[str, str], response_language: str | None = None
 ) -> tuple[str, float, str, list[str]]:
     warnings: list[str] = []
     provider_state = provider_status()
     if provider_state.llm_provider_configured:
         source_pack = _source_pack(query, sources, texts)
+        language_code = response_language or _detect_language(query)
+        language_name = _LANGUAGE_NAMES.get(language_code, "English")
         prompt = (
             "You are the answer-generation component inside ORBYTHRA. Answer the user's question directly and concisely. "
+            f"Reply in {language_name}, matching the language of the user's query. Preserve URLs, code, identifiers and quoted source names as-is. "
             "When a SOURCE PACK is present, use only facts supported by that pack; do not invent citations or facts. "
             "If evidence is insufficient, explicitly say what cannot be established. Prefer 1-4 clear declarative sentences.\n\n"
             f"USER QUERY:\n{query}\n\nSOURCE PACK:\n{source_pack or '[no external evidence supplied]'}"
@@ -439,6 +472,7 @@ def _error_response(query: str, code: str, pipeline: list[PipelineStep], warning
 @router.post("", response_model=UnifiedAnswerResponse)
 def answer(body: UnifiedAnswerRequest, request: Request, principal: Principal = Depends(_REQUIRE_OPERATOR)) -> UnifiedAnswerResponse:
     query = body.query.strip()
+    answer_language = _detect_language(query)
     request_id = "answer-" + uuid.uuid4().hex
     nonce = secrets.token_hex(24)
     pipeline: list[PipelineStep] = [PipelineStep(step="understanding_question", status="PASS", detail="query accepted")]
@@ -529,6 +563,7 @@ def answer(body: UnifiedAnswerRequest, request: Request, principal: Principal = 
                 ))
                 return UnifiedAnswerResponse(
                     query=query,
+                    answer_language=answer_language,
                     status="BLOCKED",
                     answer=None,
                     confidence=None,
@@ -563,6 +598,7 @@ def answer(body: UnifiedAnswerRequest, request: Request, principal: Principal = 
             model_id=model_id,
             sources=sources,
             texts=texts,
+            response_language=answer_language,
         )
         warnings.extend(generation_warnings)
         routed.append("/v10/providers/invoke")
@@ -692,6 +728,7 @@ def answer(body: UnifiedAnswerRequest, request: Request, principal: Principal = 
     )
     return UnifiedAnswerResponse(
         query=query,
+        answer_language=answer_language,
         status=final_status,
         answer=visible_answer,
         confidence=round(confidence, 4) if visible_answer is not None else None,

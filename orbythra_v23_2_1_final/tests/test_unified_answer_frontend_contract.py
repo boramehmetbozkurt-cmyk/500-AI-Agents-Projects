@@ -143,3 +143,14 @@ def test_google_programmable_search_remains_fallback(monkeypatch) -> None:
     monkeypatch.setenv("GOOGLE_SEARCH_API_KEY", "google-secret")
     monkeypatch.setenv("GOOGLE_SEARCH_ENGINE_ID", "google-engine")
     assert isinstance(providers.google_search_provider(), GoogleSearchProvider)
+
+
+def test_multilingual_ui_contract() -> None:
+    source = Path("client/src/main.jsx").read_text(encoding="utf-8")
+    i18n = Path("client/src/ui_i18n.js").read_text(encoding="utf-8")
+    assert "installUiTranslation" in source
+    assert "langselect" in source
+    for code in ("en", "tr", "de", "fr", "es", "it", "ar"):
+        assert f"['{code}'" in i18n
+    assert "window.location.reload()" in i18n
+    assert "document.documentElement.dir=lang==='ar'?'rtl':'ltr'" in i18n
